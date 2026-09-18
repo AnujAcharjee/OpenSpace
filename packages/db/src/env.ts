@@ -1,4 +1,24 @@
-import 'dotenv/config';
+import dotenv from 'dotenv';
+import fs from 'fs';
+import path from 'path';
+
+// 1. Load from current working directory
+dotenv.config();
+
+// 2. If DATABASE_URL is not set, attempt to load from parent monorepo directories
+if (!process.env.DATABASE_URL) {
+  let currentDir = process.cwd();
+  for (let i = 0; i < 4; i++) {
+    const parentEnvPath = path.resolve(currentDir, '.env');
+    if (fs.existsSync(parentEnvPath)) {
+      dotenv.config({ path: parentEnvPath });
+      if (process.env.DATABASE_URL) break;
+    }
+    const parentDir = path.dirname(currentDir);
+    if (parentDir === currentDir) break;
+    currentDir = parentDir;
+  }
+}
 
 export interface DbEnv {
   DATABASE_URL: string;
