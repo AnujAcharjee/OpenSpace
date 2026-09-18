@@ -17,7 +17,3 @@ Each service handles a single responsibility, making the system:
 
 - Messaging (current) — Real-time chat with ordered and durable delivery
 - Video Call (coming soon) — Live communication layer on top of existing infra
-
-## Architecture
-
-![System Design](./system.svg)
