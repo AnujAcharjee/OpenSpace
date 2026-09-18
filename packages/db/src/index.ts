@@ -1,27 +1,26 @@
-import 'dotenv/config';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../generated/prisma/client.js';
 import { createLogger } from '@repo/logger';
+import { env } from './env.js';
 
-const logger = createLogger(process.env.NODE_ENV === 'development' ? 'debug' : 'info', process.env.NODE_ENV === 'development');
+const logger = createLogger(env.isDev ? 'debug' : 'info', env.isDev);
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
 function createPrismaClient(): PrismaClient {
-  const connectionString = process.env.DATABASE_URL;
-  const adapter = connectionString ? new PrismaPg({ connectionString }) : undefined;
+  const adapter = new PrismaPg({ connectionString: env.DATABASE_URL });
 
   return new PrismaClient({
-    ...(adapter ? { adapter } : {}),
-    log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+    adapter,
+    log: env.isDev ? ['query', 'error', 'warn'] : ['error'],
   });
 }
 
 export const prisma: PrismaClient = globalForPrisma.prisma ?? createPrismaClient();
 
-if (process.env.NODE_ENV !== 'production') {
+if (!env.isProd) {
   globalForPrisma.prisma = prisma;
 }
 
@@ -34,5 +33,6 @@ export async function checkDbConnection(): Promise<void> {
   }
 }
 
+export { env } from './env.js';
 export * from '../generated/prisma/client.js';
 export default prisma;

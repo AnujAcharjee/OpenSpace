@@ -1,5 +1,6 @@
 import 'dotenv/config';
-import { defineConfig, env } from 'prisma/config';
+import { defineConfig } from 'prisma/config';
+import { env } from './src/env.js';
 
 export default defineConfig({
   schema: 'prisma/schema.prisma',
@@ -7,6 +8,6 @@ export default defineConfig({
     path: 'prisma/migrations',
   },
   datasource: {
-    url: process.env.DATABASE_URL ?? 'postgresql://postgres:postgres@localhost:5432/collab',
+    url: env.DATABASE_URL,
   },
 });
