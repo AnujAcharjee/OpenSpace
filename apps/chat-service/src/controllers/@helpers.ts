@@ -1,6 +1,4 @@
-import type { ServiceError } from '@grpc/grpc-js';
-import { status } from '@grpc/grpc-js';
-import { MessageType, type RoomMessages } from '@repo/proto';
+import { prisma, type ChatMessage, type User, MessageType } from '@repo/db';
 
 export type ChatMessageRecord = {
   id: string;
@@ -18,45 +16,30 @@ export type ChatMessageRecord = {
   senderAvatarUrl?: string;
 };
 
-export function toChatMessageRecord(message: RoomMessages): ChatMessageRecord {
+export function toChatMessageRecord(
+  message: ChatMessage & { user?: User | null },
+): ChatMessageRecord {
   return {
     id: message.id,
-    type: MessageType[message.type] as keyof typeof MessageType,
+    type: message.type,
     userId: message.userId,
     roomId: message.roomId,
     text: message.text || undefined,
-    attachments: message.attachments,
-    parentId: message.parentId,
+    attachments: message.attachments ? (typeof message.attachments === 'string' ? message.attachments : JSON.stringify(message.attachments)) : undefined,
+    parentId: message.parentId ?? undefined,
     isDeleted: message.isDeleted,
     modifiedAt: message.modifiedAt?.toISOString(),
-    createdAt: message.createdAt?.toISOString() ?? new Date(0).toISOString(),
-    updatedAt: message.updatedAt?.toISOString() ?? new Date(0).toISOString(),
-    senderUsername: message.senderUsername,
-    senderAvatarUrl: message.senderAvatarUrl,
+    createdAt: message.createdAt.toISOString(),
+    updatedAt: message.updatedAt.toISOString(),
+    senderUsername: message.user?.username ?? 'Unknown',
+    senderAvatarUrl: message.user?.avatarUrl ?? undefined,
   };
 }
 
-export function toHttpError(error: unknown): { statusCode: number; message: string } {
-  if (typeof error === 'object' && error !== null && 'code' in error) {
-    const grpcError = error as ServiceError;
-
-    switch (grpcError.code) {
-      case status.INVALID_ARGUMENT:
-        return { statusCode: 400, message: grpcError.details || 'Invalid request' };
-      case status.NOT_FOUND:
-        return { statusCode: 404, message: grpcError.details || 'Resource not found' };
-      case status.ALREADY_EXISTS:
-        return { statusCode: 409, message: grpcError.details || 'Resource already exists' };
-      case status.FAILED_PRECONDITION:
-        return { statusCode: 412, message: grpcError.details || 'Request cannot be completed' };
-      default:
-        return { statusCode: 500, message: grpcError.details || 'Internal server error' };
-    }
-  }
-
-  if (error instanceof Error) {
-    return { statusCode: 500, message: error.message };
-  }
-
-  return { statusCode: 500, message: 'Internal server error' };
+export async function getRoomMemberIds(roomId: string): Promise<string[]> {
+  const members = await prisma.chatRoomMember.findMany({
+    where: { roomId },
+    select: { userId: true },
+  });
+  return members.map((m) => m.userId);
 }

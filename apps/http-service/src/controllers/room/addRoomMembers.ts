@@ -1,75 +1,66 @@
-import type { ServiceError } from '@grpc/grpc-js';
-import { status } from '@grpc/grpc-js';
 import type { Request, Response } from 'express';
-import {
-  grpcUnary,
-  RoomMemberRole,
-  type AddRoomMemberRequest as AddRoomMemberRpcRequest,
-  type ChatRoom,
-  type ChatRoomMember,
-  type GetRoomRequest as GetRoomRpcRequest,
-  type GetUserRequest as GetUserRpcRequest,
-  type User,
-} from '@repo/proto';
-import type {
-  AddRoomMembersRequest as AddRoomMembersInput,
-  RoomMemberRecord,
-  RoomRecord,
-} from '@repo/validation';
-import { dbGrpcClient } from '../../lib/grpc.js';
-import { toGrpcAppError, toRoomMemberRecord, toRoomRecord } from '../@helpers.js';
-
-function fetchRoom(id: string): Promise<RoomRecord> {
-  const request: GetRoomRpcRequest = { id };
-
-  return grpcUnary<ChatRoom>((callback) => dbGrpcClient.getRoom(request, callback))
-    .then((response) => toRoomRecord(response))
-    .catch((error) => Promise.reject(toGrpcAppError(error, 'Room')));
-}
-
-function fetchUserByUsername(username: string): Promise<User> {
-  const request: GetUserRpcRequest = { username };
-
-  return grpcUnary<User>((callback) => dbGrpcClient.getUser(request, callback)).catch((error) =>
-    Promise.reject(toGrpcAppError(error, 'User')),
-  );
-}
-
-function addMember(roomId: string, userId: string): Promise<RoomMemberRecord | null> {
-  const request: AddRoomMemberRpcRequest = {
-    roomId,
-    userId,
-    role: RoomMemberRole.MEMBER,
-  };
-
-  return grpcUnary<ChatRoomMember>((callback) => dbGrpcClient.addRoomMember(request, callback))
-    .then((response) => toRoomMemberRecord(response))
-    .catch((error: ServiceError) => {
-      if (error.code === status.ALREADY_EXISTS) {
-        return Promise.resolve(null);
-      }
-
-      return Promise.reject(toGrpcAppError(error, 'Room member'));
-    });
-}
+import type { AddRoomMembersRequest as AddRoomMembersInput } from '@repo/validation';
+import crypto from 'crypto';
+import { prisma, RoomMemberRole } from '@repo/db';
+import { toRoomRecord } from '../@helpers.js';
+import { AppError } from '../../utils/appError.js';
 
 export const addRoomMembers = async (req: Request, res: Response) => {
   const { id: roomId } = req.params as AddRoomMembersInput['params'];
   const { usernames } = req.body as AddRoomMembersInput['body'];
+
   const normalizedUsernames = [
     ...new Set(usernames.map((username) => username.trim().replace(/^@+/, ''))),
   ].filter(Boolean);
 
-  const users = await Promise.all(normalizedUsernames.map((username) => fetchUserByUsername(username)));
-  const createdMembers = await Promise.all(users.map((user) => addMember(roomId, user.id)));
-  const room = await fetchRoom(roomId);
+  const room = await prisma.chatRoom.findUnique({
+    where: { id: roomId },
+  });
+
+  if (!room) {
+    throw new AppError('Room not found', 404);
+  }
+
+  const users = await prisma.user.findMany({
+    where: {
+      username: { in: normalizedUsernames },
+    },
+  });
+
+  if (users.length > 0) {
+    await prisma.chatRoomMember.createMany({
+      data: users.map((user) => ({
+        id: crypto.randomUUID(),
+        roomId,
+        userId: user.id,
+        role: RoomMemberRole.MEMBER,
+      })),
+      skipDuplicates: true,
+    });
+  }
+
+  const updatedRoom = await prisma.chatRoom.findUnique({
+    where: { id: roomId },
+    include: {
+      creator: true,
+      members: {
+        include: {
+          user: true,
+        },
+      },
+    },
+  });
+
+  if (!updatedRoom) {
+    throw new AppError('Room not found', 404);
+  }
 
   return res.status(201).json({
     success: true,
     message: 'Members added successfully',
     data: {
-      room,
-      addedCount: createdMembers.filter(Boolean).length,
+      room: toRoomRecord(updatedRoom),
+      addedCount: users.length,
     },
   });
 };

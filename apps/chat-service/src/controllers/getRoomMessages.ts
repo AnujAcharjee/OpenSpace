@@ -1,8 +1,8 @@
 import type { Request, Response } from 'express';
 import type { GetRoomMessagesInput } from '@repo/validation';
-import { getRoomMemberIds, getRoomMessages as getRoomMessagesRpc } from '../grpc/index.js';
+import { prisma } from '@repo/db';
+import { getRoomMemberIds, toChatMessageRecord } from './@helpers.js';
 import { logger } from '../lib/logger.js';
-import { toHttpError } from './@helpers.js';
 
 export const getRoomMessages = async (req: Request, res: Response) => {
   const { roomId } = req.params as GetRoomMessagesInput['params'];
@@ -28,22 +28,33 @@ export const getRoomMessages = async (req: Request, res: Response) => {
       });
     }
 
-    const messages = await getRoomMessagesRpc(roomId, limit);
+    const messages = await prisma.chatMessage.findMany({
+      where: {
+        roomId,
+        isDeleted: false,
+      },
+      include: {
+        user: true,
+      },
+      orderBy: {
+        createdAt: 'asc',
+      },
+      take: limit ? Number(limit) : 100,
+    });
 
     return res.status(200).json({
       success: true,
       data: {
         roomId,
-        messages,
+        messages: messages.map(toChatMessageRecord),
       },
     });
   } catch (error) {
     logger.error({ error, roomId, userId, limit }, 'Get room messages failed');
-    const httpError = toHttpError(error);
 
-    return res.status(httpError.statusCode).json({
+    return res.status(500).json({
       success: false,
-      error: httpError.message,
+      error: error instanceof Error ? error.message : 'Get room messages failed',
     });
   }
 };

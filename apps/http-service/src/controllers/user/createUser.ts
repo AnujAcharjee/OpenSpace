@@ -1,30 +1,35 @@
 import type { Request, Response } from 'express';
-import type { CreateUserInput, UserRecord } from '@repo/validation';
-import { grpcUnary, type CreateUserRequest, type User } from '@repo/proto';
-import { dbGrpcClient } from '../../lib/grpc.js';
-import { mapToGrpcString, toGrpcAppError, toUserRecord } from '../@helpers.js';
-
-function pushUser(input: CreateUserInput): Promise<UserRecord> {
-  const request: CreateUserRequest = {
-    email: input.email,
-    username: input.username,
-    name: mapToGrpcString(input.name),
-    bio: mapToGrpcString(input.bio),
-    avatarUrl: mapToGrpcString(input.avatarUrl),
-  };
-
-  return grpcUnary<User>((callback) => dbGrpcClient.createUser(request, callback))
-    .then((response) => toUserRecord(response))
-    .catch((error) => Promise.reject(toGrpcAppError(error, 'User')));
-}
+import type { CreateUserInput } from '@repo/validation';
+import crypto from 'crypto';
+import { prisma, Prisma } from '@repo/db';
+import { toUserRecord } from '../@helpers.js';
+import { AppError } from '../../utils/appError.js';
 
 export const createUser = async (req: Request, res: Response) => {
   const data = req.body as CreateUserInput;
-  const persistedUser = await pushUser(data);
 
-  return res.status(201).json({
-    success: true,
-    message: 'User created successfully',
-    data: { user: persistedUser },
-  });
+  try {
+    const user = await prisma.user.create({
+      data: {
+        id: crypto.randomUUID(),
+        email: data.email.toLowerCase(),
+        username: data.username,
+        name: data.name ?? null,
+        bio: data.bio ?? null,
+        avatarUrl: data.avatarUrl ?? null,
+        updatedAt: new Date(),
+      },
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: 'User created successfully',
+      data: { user: toUserRecord(user) },
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      throw new AppError('User with this email or username already exists', 409);
+    }
+    throw error;
+  }
 };

@@ -1,62 +1,52 @@
 import type { Request, Response } from 'express';
-import type { RoomRecord, UserRecord } from '@repo/validation';
-import {
-  grpcUnary,
-  type GetUserRequest as HydrateUserRpcRequest,
-  type HydrateUserResponse,
-} from '@repo/proto';
-import { dbGrpcClient } from '../../lib/grpc.js';
-import { toGrpcAppError, toRoomRecord, toUserRecord } from '../@helpers.js';
+import { prisma } from '@repo/db';
+import { toRoomRecord, toUserRecord } from '../@helpers.js';
 import { AppError } from '../../utils/appError.js';
 
-type UserLookup = {
-  id?: string;
-  email?: string;
-  username?: string;
-};
-
-type HydratedUserRecord = {
-  user: UserRecord;
-  rooms: RoomRecord[];
-};
-
-function fetchHydratedUser(lookup: UserLookup): Promise<HydratedUserRecord> {
-  const request: HydrateUserRpcRequest = {
-    ...(lookup.id && { id: lookup.id }),
-    ...(lookup.email && { email: lookup.email }),
-    ...(lookup.username && { username: lookup.username }),
-  };
-
-  return grpcUnary<HydrateUserResponse>((callback) => dbGrpcClient.hydrateUser(request, callback))
-    .catch((error) => Promise.reject(toGrpcAppError(error, 'User')))
-    .then((response) => {
-      if (!response.user) {
-        throw new AppError('Hydrate user response was missing user data', 500);
-      }
-
-      return {
-        user: toUserRecord(response.user),
-        rooms: (response.rooms ?? []).map(toRoomRecord),
-      };
-    });
-}
-
 export const hydrateUser = async (req: Request, res: Response) => {
-  console.log('req.user:', req.user);
+  const userId = req.user?.id;
 
-  if (!req.user?.id) {
+  if (!userId) {
     return res.status(401).json({
       success: false,
       message: 'Unauthorized',
     });
   }
 
-  const hydratedUser = await fetchHydratedUser({
-    id: req.user.id,
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: {
+      memberships: {
+        include: {
+          chatRoom: {
+            include: {
+              creator: true,
+              members: {
+                include: {
+                  user: true,
+                },
+              },
+            },
+          },
+        },
+      },
+    },
   });
+
+  if (!user) {
+    throw new AppError('User not found', 404);
+  }
+
+  const rooms = user.memberships
+    .map((membership) => membership.chatRoom)
+    .filter((room): room is NonNullable<typeof room> => Boolean(room))
+    .map(toRoomRecord);
 
   return res.status(200).json({
     success: true,
-    data: hydratedUser,
+    data: {
+      user: toUserRecord(user),
+      rooms,
+    },
   });
 };

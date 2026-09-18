@@ -1,26 +1,8 @@
 import type { Request, Response } from 'express';
-import type { GetUserRequest, UserRecord } from '@repo/validation';
-import { grpcUnary, type GetUserRequest as GetUserRpcRequest, type User } from '@repo/proto';
-import { dbGrpcClient } from '../../lib/grpc.js';
-import { toGrpcAppError, toUserRecord } from '../@helpers.js';
-
-type UserLookup = {
-  id?: string;
-  email?: string;
-  username?: string;
-};
-
-function fetchUser(lookup: UserLookup): Promise<UserRecord> {
-  const request: GetUserRpcRequest = {
-    id: lookup.id,
-    email: lookup.email,
-    username: lookup.username,
-  };
-
-  return grpcUnary<User>((callback) => dbGrpcClient.getUser(request, callback))
-    .then((response) => toUserRecord(response))
-    .catch((error) => Promise.reject(toGrpcAppError(error, 'User')));
-}
+import type { GetUserRequest } from '@repo/validation';
+import { prisma } from '@repo/db';
+import { toUserRecord } from '../@helpers.js';
+import { AppError } from '../../utils/appError.js';
 
 export const getUser = async (req: Request, res: Response) => {
   const validatedRequest = {
@@ -28,16 +10,26 @@ export const getUser = async (req: Request, res: Response) => {
     query: req.query,
   } as GetUserRequest;
 
-  const data: UserLookup = {
-    id: validatedRequest.params.id ?? validatedRequest.query.id,
-    email: validatedRequest.query.email?.toLowerCase(),
-    username: validatedRequest.query.username,
-  };
+  const id = validatedRequest.params.id ?? validatedRequest.query.id;
+  const email = validatedRequest.query.email?.toLowerCase();
+  const username = validatedRequest.query.username;
 
-  const user = await fetchUser(data);
+  const user = await prisma.user.findFirst({
+    where: {
+      OR: [
+        ...(id ? [{ id }] : []),
+        ...(email ? [{ email }] : []),
+        ...(username ? [{ username }] : []),
+      ],
+    },
+  });
+
+  if (!user) {
+    throw new AppError('User not found', 404);
+  }
 
   return res.status(200).json({
     success: true,
-    data: { user },
+    data: { user: toUserRecord(user) },
   });
 };

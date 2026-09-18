@@ -1,30 +1,41 @@
 import type { Request, Response } from 'express';
-import type { EditRoomRequest as EditRoomInput, RoomRecord } from '@repo/validation';
-import { grpcUnary, type ChatRoom, type EditRoomRequest as EditRoomRpcRequest } from '@repo/proto';
-import { dbGrpcClient } from '../../lib/grpc.js';
-import { toGrpcAppError, toRoomRecord } from '../@helpers.js';
-
-function updateRoom(id: string, input: EditRoomInput['body']): Promise<RoomRecord> {
-  const request: EditRoomRpcRequest = {
-    id,
-    name: input.name,
-    description: input.description,
-    isPrivate: input.isPrivate,
-  };
-
-  return grpcUnary<ChatRoom>((callback) => dbGrpcClient.editRoom(request, callback))
-    .then((response) => toRoomRecord(response))
-    .catch((error) => Promise.reject(toGrpcAppError(error, 'Room')));
-}
+import type { EditRoomRequest as EditRoomInput } from '@repo/validation';
+import { prisma, Prisma } from '@repo/db';
+import { toRoomRecord } from '../@helpers.js';
+import { AppError } from '../../utils/appError.js';
 
 export const editRoom = async (req: Request, res: Response) => {
   const data = req.body as EditRoomInput['body'];
   const { id } = req.params as EditRoomInput['params'];
-  const updatedRoom = await updateRoom(id, data);
 
-  return res.status(200).json({
-    success: true,
-    message: 'Room updated successfully',
-    data: { room: updatedRoom },
-  });
+  try {
+    const updatedRoom = await prisma.chatRoom.update({
+      where: { id },
+      data: {
+        ...(data.name !== undefined && { name: data.name }),
+        ...(data.description !== undefined && { description: data.description }),
+        ...(data.isPrivate !== undefined && { isPrivate: data.isPrivate }),
+        updatedAt: new Date(),
+      },
+      include: {
+        creator: true,
+        members: {
+          include: {
+            user: true,
+          },
+        },
+      },
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Room updated successfully',
+      data: { room: toRoomRecord(updatedRoom) },
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+      throw new AppError('Room not found', 404);
+    }
+    throw error;
+  }
 };

@@ -1,7 +1,7 @@
 import type { Request, Response } from 'express';
+import { prisma } from '@repo/db';
 import { logger } from '../lib/logger.js';
-import { getRoomMemberIds, getRoomMessages } from '../grpc/index.js';
-import type { ChatMessageRecord } from './@helpers.js';
+import { getRoomMemberIds, toChatMessageRecord } from './@helpers.js';
 
 export const getRoomHistory = async (req: Request, res: Response) => {
   const roomIdParam = req.params.roomId;
@@ -24,13 +24,25 @@ export const getRoomHistory = async (req: Request, res: Response) => {
     return res.status(403).json({ success: false, error: 'Only room members can view room messages' });
   }
 
-  const messages: ChatMessageRecord[] = await getRoomMessages(roomId, 80);
+  const messages = await prisma.chatMessage.findMany({
+    where: {
+      roomId,
+      isDeleted: false,
+    },
+    include: {
+      user: true,
+    },
+    orderBy: {
+      createdAt: 'asc',
+    },
+    take: 80,
+  });
 
   return res.status(200).json({
     success: true,
     data: {
       roomId,
-      messages,
+      messages: messages.map(toChatMessageRecord),
     },
   });
 };

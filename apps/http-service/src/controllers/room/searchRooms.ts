@@ -1,28 +1,31 @@
 import type { Request, Response } from 'express';
-import type { RoomRecord, SearchRoomsRequest } from '@repo/validation';
-import {
-  grpcUnary,
-  type ChatRoom,
-  type SearchRoomsRequest as SearchRoomsRpcRequest,
-  type SearchRoomsResponse,
-} from '@repo/proto';
-import { dbGrpcClient } from '../../lib/grpc.js';
-import { toGrpcAppError, toRoomRecord } from '../@helpers.js';
-
-function fetchRoomsByName(name: string): Promise<RoomRecord[]> {
-  const request: SearchRoomsRpcRequest = { name };
-
-  return grpcUnary<SearchRoomsResponse>((callback) => dbGrpcClient.searchRooms(request, callback))
-    .then((response) => response.rooms.map((room: ChatRoom) => toRoomRecord(room)))
-    .catch((error) => Promise.reject(toGrpcAppError(error, 'Room')));
-}
+import type { SearchRoomsRequest } from '@repo/validation';
+import { prisma } from '@repo/db';
+import { toRoomRecord } from '../@helpers.js';
 
 export const searchRooms = async (req: Request, res: Response) => {
   const { name } = req.query as SearchRoomsRequest['query'];
-  const rooms = await fetchRoomsByName(name);
+
+  const rooms = await prisma.chatRoom.findMany({
+    where: {
+      name: {
+        contains: name,
+        mode: 'insensitive',
+      },
+    },
+    include: {
+      creator: true,
+      members: {
+        include: {
+          user: true,
+        },
+      },
+    },
+    take: 50,
+  });
 
   return res.status(200).json({
     success: true,
-    data: { rooms },
+    data: { rooms: rooms.map(toRoomRecord) },
   });
 };

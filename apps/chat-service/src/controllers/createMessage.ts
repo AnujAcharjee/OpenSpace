@@ -1,17 +1,11 @@
 import type { Request, Response } from 'express';
 import type { ChatMessagePayloadAndReceivers, CreateMessageInput } from '@repo/validation';
-import { MessageType } from '@repo/proto';
-import { createMessage as createMessageRpc, getRoomMemberIds } from '../grpc/index.js';
+import { v4 as uuidv4 } from 'uuid';
+import { prisma, MessageType } from '@repo/db';
+import { getRoomMemberIds, toChatMessageRecord } from './@helpers.js';
 import { logger } from '../lib/logger.js';
 import { redis } from '../lib/redis.js';
-import { toHttpError } from './@helpers.js';
 
-const messageTypeMap = {
-  TEXT: MessageType.TEXT,
-  IMAGE: MessageType.IMAGE,
-  FILE: MessageType.FILE,
-  SYSTEM: MessageType.SYSTEM,
-} as const;
 const REDIS_CHANNEL = 'chat-messages';
 
 export const createMessage = async (req: Request, res: Response) => {
@@ -36,46 +30,55 @@ export const createMessage = async (req: Request, res: Response) => {
       });
     }
 
-    const message = await createMessageRpc({
-      userId: sender,
-      roomId,
-      text,
-      attachments,
-      parentId,
-      type: messageTypeMap[type ?? 'TEXT'],
+    const messageId = uuidv4();
+    const created = await prisma.chatMessage.create({
+      data: {
+        id: messageId,
+        userId: sender,
+        roomId,
+        text: text ?? '',
+        attachments: attachments ? JSON.parse(attachments) : null,
+        parentId: parentId ?? null,
+        type: (type as keyof typeof MessageType) ?? MessageType.TEXT,
+        updatedAt: new Date(),
+      },
+      include: {
+        user: true,
+      },
     });
+
+    const messageRecord = toChatMessageRecord(created);
 
     try {
       if (receivers.length > 0) {
         const wsPayload: ChatMessagePayloadAndReceivers = {
-          id: message.id,
-          sender: message.userId,
-          text: message.text,
-          attachments: message.attachments,
-          roomId: message.roomId,
-          parentId: message.parentId,
-          createdAt: message.createdAt,
+          id: messageRecord.id,
+          sender: messageRecord.userId,
+          text: messageRecord.text,
+          attachments: messageRecord.attachments,
+          roomId: messageRecord.roomId,
+          parentId: messageRecord.parentId,
+          createdAt: messageRecord.createdAt,
           receivers,
         };
 
         await redis.publish(REDIS_CHANNEL, JSON.stringify(wsPayload));
       }
     } catch (publishError) {
-      logger.error({ publishError, messageId: message.id }, 'Message created but live publish failed');
+      logger.error({ publishError, messageId: messageRecord.id }, 'Message created but live publish failed');
     }
 
     return res.status(201).json({
       success: true,
       message: 'Message created successfully',
-      data: { message },
+      data: { message: messageRecord },
     });
   } catch (error) {
     logger.error({ error }, 'Create message failed');
-    const httpError = toHttpError(error);
 
-    return res.status(httpError.statusCode).json({
+    return res.status(500).json({
       success: false,
-      error: httpError.message,
+      error: error instanceof Error ? error.message : 'Create message failed',
     });
   }
 };

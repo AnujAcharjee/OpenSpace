@@ -1,15 +1,10 @@
-import type { ServiceError } from '@grpc/grpc-js';
-import { status } from '@grpc/grpc-js';
 import {
-  JoinRequestStatus,
-  RoomMemberRole,
-  type ChatRoom,
-  type ChatRoomJoinRequest,
-  type ChatRoomMember,
   type User,
-} from '@repo/proto';
+  type ChatRoom,
+  type ChatRoomMember,
+  type ChatRoomJoinRequest,
+} from '@repo/db';
 import type { RoomJoinRequestRecord, RoomMemberRecord, RoomRecord, UserRecord } from '@repo/validation';
-import { AppError } from '../utils/appError.js';
 
 export function toUserRecord(user: User): UserRecord {
   return {
@@ -25,49 +20,36 @@ export function toUserRecord(user: User): UserRecord {
   };
 }
 
-function toRoomMemberRole(role: RoomMemberRole): RoomMemberRecord['role'] {
-  switch (role) {
-    case RoomMemberRole.ADMIN:
-      return 'ADMIN';
-    case RoomMemberRole.OWNER:
-      return 'OWNER';
-    case RoomMemberRole.MEMBER:
-    default:
-      return 'MEMBER';
-  }
-}
-
-export function toRoomMemberRecord(member: ChatRoomMember): RoomMemberRecord {
+export function toRoomMemberRecord(member: ChatRoomMember & { user?: User | null }): RoomMemberRecord {
   return {
     id: member.id,
     roomId: member.roomId,
     userId: member.userId,
-    role: toRoomMemberRole(member.role),
+    role: member.role,
     createdAt: member.createdAt?.toISOString() ?? new Date(0).toISOString(),
     user: member.user ? toUserRecord(member.user) : null,
   };
 }
 
-function toJoinRequestStatus(status: JoinRequestStatus): RoomJoinRequestRecord['status'] {
-  switch (status) {
-    case JoinRequestStatus.PENDING:
-    default:
-      return 'PENDING';
-  }
-}
-
-export function toRoomJoinRequestRecord(joinRequest: ChatRoomJoinRequest): RoomJoinRequestRecord {
+export function toRoomJoinRequestRecord(
+  joinRequest: ChatRoomJoinRequest & { user?: User | null },
+): RoomJoinRequestRecord {
   return {
     id: joinRequest.id,
     roomId: joinRequest.roomId,
     userId: joinRequest.userId,
-    status: toJoinRequestStatus(joinRequest.status),
+    status: joinRequest.status,
     createdAt: joinRequest.createdAt?.toISOString() ?? new Date(0).toISOString(),
     user: joinRequest.user ? toUserRecord(joinRequest.user) : null,
   };
 }
 
-export function toRoomRecord(room: ChatRoom): RoomRecord {
+export function toRoomRecord(
+  room: ChatRoom & {
+    creator?: User | null;
+    members?: (ChatRoomMember & { user?: User | null })[];
+  },
+): RoomRecord {
   return {
     id: room.id,
     name: room.name,
@@ -77,26 +59,6 @@ export function toRoomRecord(room: ChatRoom): RoomRecord {
     createdAt: room.createdAt?.toISOString() ?? new Date(0).toISOString(),
     updatedAt: room.updatedAt?.toISOString() ?? new Date(0).toISOString(),
     creator: room.creator ? toUserRecord(room.creator) : null,
-    members: room.members.map(toRoomMemberRecord),
+    members: (room.members ?? []).map(toRoomMemberRecord),
   };
 }
-
-export function toGrpcAppError(error: ServiceError, resourceName = 'Resource'): AppError {
-  switch (error.code) {
-    case status.INVALID_ARGUMENT:
-      return new AppError(error.details || 'Invalid request', 400);
-    case status.NOT_FOUND:
-      return new AppError(error.details || `${resourceName} not found`, 404);
-    case status.ALREADY_EXISTS:
-      return new AppError(error.details || `${resourceName} already exists`, 409);
-    default:
-      return new AppError(error.details || 'Internal server error', 500);
-  }
-}
-
-export function mapToGrpcString(value: string | null | undefined): string | undefined {
-  if (value === undefined) return undefined;
-  if (value === null) return '';
-  return value;
-}
-

@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import { getRoomMemberIds } from '../grpc/index.js';
+import { getRoomMemberIds } from './@helpers.js';
 import { logger } from '../lib/logger.js';
 import { redis } from '../lib/redis.js';
 

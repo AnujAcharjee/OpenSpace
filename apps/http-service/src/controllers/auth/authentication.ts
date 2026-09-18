@@ -1,14 +1,7 @@
 import type { Request, Response } from 'express';
 import crypto from 'crypto';
-import { status, type ServiceError } from '@grpc/grpc-js';
-import {
-  grpcUnary,
-  type CreateUserRequest as CreateUserRpcRequest,
-  type GetUserRequest as GetUserRpcRequest,
-  type User,
-} from '@repo/proto';
+import { prisma, Prisma } from '@repo/db';
 import { auth, type ProviderProfile } from '../../lib/auth.js';
-import { dbGrpcClient } from '../../lib/grpc.js';
 import { redis } from '../../lib/redis.js';
 import { logger } from '../../lib/logger.js';
 import { toUserRecord } from '../@helpers.js';
@@ -196,26 +189,12 @@ async function fetchInfo(providerUserId: string, accessToken: string): Promise<P
   return json.data;
 }
 
-function isGrpcAlreadyExists(error: unknown): boolean {
-  return (
-    typeof error === 'object' && error !== null && 'code' in error && error.code === status.ALREADY_EXISTS
-  );
-}
-
-function isGrpcNotFound(error: unknown): error is ServiceError {
-  return typeof error === 'object' && error !== null && 'code' in error && error.code === status.NOT_FOUND;
-}
-
 async function fetchUserByEmail(email: string) {
-  const request: GetUserRpcRequest = { email };
+  const user = await prisma.user.findUnique({
+    where: { email: email.toLowerCase() },
+  });
 
-  try {
-    const user = await grpcUnary<User>((callback) => dbGrpcClient.getUser(request, callback));
-    return toUserRecord(user);
-  } catch (error) {
-    if (isGrpcNotFound(error)) return null;
-    throw error;
-  }
+  return user ? toUserRecord(user) : null;
 }
 
 async function createUserProfile(input: {
@@ -224,14 +203,17 @@ async function createUserProfile(input: {
   name?: string;
   avatarUrl?: string;
 }) {
-  const request: CreateUserRpcRequest = {
-    email: input.email,
-    username: input.username,
-    name: input.name,
-    avatarUrl: input.avatarUrl,
-  };
+  const user = await prisma.user.create({
+    data: {
+      id: crypto.randomUUID(),
+      email: input.email.toLowerCase(),
+      username: input.username,
+      name: input.name ?? null,
+      avatarUrl: input.avatarUrl ?? null,
+      updatedAt: new Date(),
+    },
+  });
 
-  const user = await grpcUnary<User>((callback) => dbGrpcClient.createUser(request, callback));
   return toUserRecord(user);
 }
 
@@ -259,7 +241,10 @@ async function ensureUserFromProfile(payload: ProviderProfile) {
     try {
       return await createUserProfile({ email, username, name, avatarUrl });
     } catch (error) {
-      if (!isGrpcAlreadyExists(error)) throw error;
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        continue;
+      }
+      throw error;
     }
   }
 

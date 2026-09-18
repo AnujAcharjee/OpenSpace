@@ -1,28 +1,37 @@
 import type { Request, Response } from 'express';
 import type { EditMessageTextInput } from '@repo/validation';
-import { editMessageText as editMessageTextRpc } from '../grpc/index.js';
+import { prisma } from '@repo/db';
+import { toChatMessageRecord } from './@helpers.js';
 import { logger } from '../lib/logger.js';
-import { toHttpError } from './@helpers.js';
 
 export const editMessageText = async (req: Request, res: Response) => {
   const { id } = req.params as EditMessageTextInput['params'];
   const { text } = req.body as EditMessageTextInput['body'];
 
   try {
-    const message = await editMessageTextRpc(id, text);
+    const updated = await prisma.chatMessage.update({
+      where: { id },
+      data: {
+        text,
+        modifiedAt: new Date(),
+        updatedAt: new Date(),
+      },
+      include: {
+        user: true,
+      },
+    });
 
     return res.status(200).json({
       success: true,
       message: 'Message updated successfully',
-      data: { message },
+      data: { message: toChatMessageRecord(updated) },
     });
   } catch (error) {
     logger.error({ error, id }, 'Edit message text failed');
-    const httpError = toHttpError(error);
 
-    return res.status(httpError.statusCode).json({
+    return res.status(500).json({
       success: false,
-      error: httpError.message,
+      error: error instanceof Error ? error.message : 'Edit message text failed',
     });
   }
 };

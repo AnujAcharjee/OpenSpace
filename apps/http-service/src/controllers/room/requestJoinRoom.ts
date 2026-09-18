@@ -1,34 +1,9 @@
 import type { Request, Response } from 'express';
-import type { RequestJoinRoomRequest as RequestJoinRoomInput, RoomRecord } from '@repo/validation';
-import {
-  grpcUnary,
-  type ChatRoom,
-  type RequestJoinRoomRequest as RequestJoinRoomRpcRequest,
-  type RequestJoinRoomResponse,
-} from '@repo/proto';
-import { dbGrpcClient } from '../../lib/grpc.js';
-import { toGrpcAppError, toRoomRecord } from '../@helpers.js';
-
-type RequestJoinRoomResult = {
-  room: RoomRecord | null;
-  joined: boolean;
-  pending: boolean;
-};
-
-function requestJoinRoom(roomId: string, userId: string): Promise<RequestJoinRoomResult> {
-  const request: RequestJoinRoomRpcRequest = {
-    roomId,
-    userId,
-  };
-
-  return grpcUnary<RequestJoinRoomResponse>((callback) => dbGrpcClient.requestJoinRoom(request, callback))
-    .then((response) => ({
-      room: response.room ? toRoomRecord(response.room as ChatRoom) : null,
-      joined: response.joined,
-      pending: response.pending,
-    }))
-    .catch((error) => Promise.reject(toGrpcAppError(error, 'Room')));
-}
+import type { RequestJoinRoomRequest as RequestJoinRoomInput } from '@repo/validation';
+import crypto from 'crypto';
+import { prisma, RoomMemberRole, JoinRequestStatus } from '@repo/db';
+import { toRoomRecord } from '../@helpers.js';
+import { AppError } from '../../utils/appError.js';
 
 export const requestJoinRoomController = async (req: Request, res: Response) => {
   const { id: roomId } = req.params as RequestJoinRoomInput['params'];
@@ -41,11 +16,97 @@ export const requestJoinRoomController = async (req: Request, res: Response) => 
     });
   }
 
-  const result = await requestJoinRoom(roomId, userId);
+  const room = await prisma.chatRoom.findUnique({
+    where: { id: roomId },
+    include: {
+      creator: true,
+      members: {
+        include: {
+          user: true,
+        },
+      },
+    },
+  });
+
+  if (!room) {
+    throw new AppError('Room not found', 404);
+  }
+
+  const existingMember = room.members.find((m) => m.userId === userId);
+  if (existingMember) {
+    return res.status(200).json({
+      success: true,
+      message: 'Already a member of this room',
+      data: {
+        room: toRoomRecord(room),
+        joined: true,
+        pending: false,
+      },
+    });
+  }
+
+  if (!room.isPrivate) {
+    // Public room: join directly
+    await prisma.chatRoomMember.create({
+      data: {
+        id: crypto.randomUUID(),
+        roomId,
+        userId,
+        role: RoomMemberRole.MEMBER,
+      },
+    });
+
+    const updatedRoom = await prisma.chatRoom.findUnique({
+      where: { id: roomId },
+      include: {
+        creator: true,
+        members: {
+          include: {
+            user: true,
+          },
+        },
+      },
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Joined room successfully',
+      data: {
+        room: updatedRoom ? toRoomRecord(updatedRoom) : null,
+        joined: true,
+        pending: false,
+      },
+    });
+  }
+
+  // Private room: create pending join request
+  await prisma.chatRoomJoinRequest.upsert({
+    where: {
+      roomId_userId: {
+        roomId,
+        userId,
+      },
+    },
+    update: {
+      status: JoinRequestStatus.PENDING,
+      updatedAt: new Date(),
+    },
+    create: {
+      id: crypto.randomUUID(),
+      roomId,
+      userId,
+      status: JoinRequestStatus.PENDING,
+      updatedAt: new Date(),
+    },
+  });
 
   return res.status(200).json({
     success: true,
-    message: result.joined ? 'Joined room successfully' : 'Join request sent',
-    data: result,
+    message: 'Join request sent',
+    data: {
+      room: null,
+      joined: false,
+      pending: true,
+    },
   });
 };

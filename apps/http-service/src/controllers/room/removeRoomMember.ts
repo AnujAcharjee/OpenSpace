@@ -1,43 +1,61 @@
 import type { Request, Response } from 'express';
-import type { RemoveRoomMemberRequest as RemoveRoomMemberInput, RoomRecord } from '@repo/validation';
-import {
-  grpcUnary,
-  type ChatRoom,
-  type GetRoomRequest as GetRoomRpcRequest,
-  type RemoveRoomMemberRequest as RemoveRoomMemberRpcRequest,
-  type RemoveRoomMemberResponse,
-} from '@repo/proto';
+import type { RemoveRoomMemberRequest as RemoveRoomMemberInput } from '@repo/validation';
 import { v4 as uuidv4 } from 'uuid';
-import { dbGrpcClient } from '../../lib/grpc.js';
+import { prisma, Prisma } from '@repo/db';
 import { logger } from '../../lib/logger.js';
 import { redis } from '../../lib/redis.js';
-import { toGrpcAppError, toRoomRecord } from '../@helpers.js';
+import { toRoomRecord } from '../@helpers.js';
+import { AppError } from '../../utils/appError.js';
 
 const REDIS_CHANNEL = 'chat-messages';
 
-function fetchRoom(id: string): Promise<RoomRecord> {
-  const request: GetRoomRpcRequest = { id };
-
-  return grpcUnary<ChatRoom>((callback) => dbGrpcClient.getRoom(request, callback))
-    .then((response) => toRoomRecord(response))
-    .catch((error) => Promise.reject(toGrpcAppError(error, 'Room')));
-}
-
-function removeMember(memberId: string): Promise<void> {
-  const request: RemoveRoomMemberRpcRequest = { id: memberId };
-
-  return grpcUnary<RemoveRoomMemberResponse>((callback) => dbGrpcClient.removeRoomMember(request, callback))
-    .then(() => undefined)
-    .catch((error) => Promise.reject(toGrpcAppError(error, 'Room member')));
-}
-
 export const removeRoomMember = async (req: Request, res: Response) => {
   const { id: roomId, memberId } = req.params as RemoveRoomMemberInput['params'];
-  const roomBeforeRemoval = await fetchRoom(roomId);
+
+  const roomBeforeRemoval = await prisma.chatRoom.findUnique({
+    where: { id: roomId },
+    include: {
+      creator: true,
+      members: {
+        include: {
+          user: true,
+        },
+      },
+    },
+  });
+
+  if (!roomBeforeRemoval) {
+    throw new AppError('Room not found', 404);
+  }
+
   const removedMember = roomBeforeRemoval.members.find((member) => member.id === memberId);
 
-  await removeMember(memberId);
-  const room = await fetchRoom(roomId);
+  try {
+    await prisma.chatRoomMember.delete({
+      where: { id: memberId },
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+      throw new AppError('Room member not found', 404);
+    }
+    throw error;
+  }
+
+  const room = await prisma.chatRoom.findUnique({
+    where: { id: roomId },
+    include: {
+      creator: true,
+      members: {
+        include: {
+          user: true,
+        },
+      },
+    },
+  });
+
+  if (!room) {
+    throw new AppError('Room not found', 404);
+  }
 
   if (removedMember) {
     const removedUsername = removedMember.user?.username ?? 'A user';
@@ -76,7 +94,7 @@ export const removeRoomMember = async (req: Request, res: Response) => {
     success: true,
     message: 'Member removed successfully',
     data: {
-      room,
+      room: toRoomRecord(room),
       id: memberId,
     },
   });
