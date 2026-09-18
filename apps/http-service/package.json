@@ -15,7 +15,7 @@
     "@grpc/grpc-js": "^1.14.3",
     "@repo/auth": "workspace:*",
     "@repo/logger": "workspace:*",
-    "@repo/proto": "workspace:*",
+    "@repo/db": "workspace:*",
     "@repo/redis": "workspace:*",
     "@repo/validation": "workspace:*",
     "cors": "^2.8.6",
