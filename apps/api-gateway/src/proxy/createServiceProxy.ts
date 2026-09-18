@@ -71,8 +71,10 @@ export function createServiceProxy({
           proxyReq.setHeader('x-user-email', r.user.email);
         }
 
-        // Restream parsed body to downstream services
-        fixRequestBody(proxyReq, r);
+        // Restream body if parsed by upstream middleware
+        if (r.body && Object.keys(r.body as object).length > 0) {
+          fixRequestBody(proxyReq, r);
+        }
       },
 
       proxyRes(proxyRes: IncomingMessage, req: unknown, res: unknown) {

@@ -29,8 +29,6 @@ const wsServiceUrls = (() => {
 const app = express();
 
 app.use(cors({ origin: webOrigin, credentials: true }));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
 app.use(requestId);
 app.use(loggingMiddleware);
 
