@@ -4,15 +4,19 @@ import { prisma } from '@repo/db';
 import { toRoomRecord } from '../@helpers.js';
 
 export const searchRooms = async (req: Request, res: Response) => {
-  const { name } = req.query as SearchRoomsRequest['query'];
+  const queryName = typeof req.query.name === 'string' ? req.query.name.trim() : '';
+
+  const where = queryName
+    ? {
+        name: {
+          contains: queryName,
+          mode: 'insensitive' as const,
+        },
+      }
+    : {};
 
   const rooms = await prisma.chatRoom.findMany({
-    where: {
-      name: {
-        contains: name,
-        mode: 'insensitive',
-      },
-    },
+    where,
     include: {
       creator: true,
       members: {
@@ -20,6 +24,9 @@ export const searchRooms = async (req: Request, res: Response) => {
           user: true,
         },
       },
+    },
+    orderBy: {
+      updatedAt: 'desc',
     },
     take: 50,
   });

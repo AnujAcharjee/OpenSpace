@@ -110,10 +110,18 @@ class Ws {
     }
   }
 
-  send(data: WsMessage) {
+  send(data: WsMessage | { type: string; [key: string]: any }) {
     if (this.#ws && this.isOpen()) {
       this.#ws.send(JSON.stringify(data))
     }
+  }
+
+  joinRoom(roomId: string) {
+    this.send({ type: "join_room", roomId })
+  }
+
+  leaveRoom(roomId: string) {
+    this.send({ type: "leave_room", roomId })
   }
 
   close() {

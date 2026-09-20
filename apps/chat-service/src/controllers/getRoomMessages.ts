@@ -1,7 +1,7 @@
 import type { Request, Response } from 'express';
 import type { GetRoomMessagesInput } from '@repo/validation';
 import { prisma } from '@repo/db';
-import { getRoomMemberIds, toChatMessageRecord } from './@helpers.js';
+import { isUserInRoom, toChatMessageRecord } from './@helpers.js';
 import { logger } from '../lib/logger.js';
 
 export const getRoomMessages = async (req: Request, res: Response) => {
@@ -19,9 +19,9 @@ export const getRoomMessages = async (req: Request, res: Response) => {
   logger.debug({ roomId, userId, limit }, 'Chat messages requested');
 
   try {
-    const memberIds = await getRoomMemberIds(roomId);
+    const isMember = await isUserInRoom(roomId, userId);
 
-    if (!memberIds.includes(userId)) {
+    if (!isMember) {
       return res.status(403).json({
         success: false,
         error: 'Only room members can view room messages',

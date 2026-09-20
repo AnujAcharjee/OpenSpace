@@ -39,28 +39,27 @@ export function toChatMessageRecord(
 
 export async function isUserInRoom(roomId: string, userId: string): Promise<boolean> {
   const cacheKey = `room:${roomId}:members`;
-  const exists = await redis.exists(cacheKey);
+  const isMember = await redis.sismember(cacheKey, userId);
 
-  if (exists) {
-    const isMember = await redis.sismember(cacheKey, userId);
-    return isMember === 1;
+  if (isMember === 1) {
+    return true;
   }
 
-  // Cache miss - hydrate from database
-  const members = await prisma.chatRoomMember.findMany({
-    where: { roomId },
-    select: { userId: true },
+  // Double check database in case member joined recently or cache is incomplete
+  const member = await prisma.chatRoomMember.findUnique({
+    where: {
+      roomId_userId: { roomId, userId },
+    },
   });
 
-  if (members.length === 0) {
-    return false;
+  if (member) {
+    // Self-healing: add member to Redis Set
+    await redis.sadd(cacheKey, userId);
+    await redis.expire(cacheKey, 86400);
+    return true;
   }
 
-  const memberIds = members.map((m) => m.userId);
-  await redis.sadd(cacheKey, ...memberIds);
-  await redis.expire(cacheKey, 86400); // 24 hour TTL
-
-  return memberIds.includes(userId);
+  return false;
 }
 
 export async function getRoomMemberIds(roomId: string): Promise<string[]> {

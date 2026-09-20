@@ -105,7 +105,7 @@ export default function RoomsSection() {
     event.preventDefault()
     const name = searchName.trim()
 
-    if (!name || isSearching) {
+    if (isSearching) {
       return
     }
 
@@ -215,7 +215,7 @@ export default function RoomsSection() {
               )}
               <button
                 type="submit"
-                disabled={isSearching || !searchName.trim()}
+                disabled={isSearching}
                 className="relative cursor-pointer rounded-md bg-primary px-2.5 py-0.5 text-xs font-semibold text-primary-foreground shadow-[0_0_10px_rgba(244,187,68,0.35)] transition-all duration-200 hover:shadow-[0_0_14px_rgba(244,187,68,0.6)] hover:brightness-105 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none dark:shadow-[0_0_12px_rgba(244,187,68,0.4)] dark:hover:shadow-[0_0_16px_rgba(244,187,68,0.7)]"
               >
                 {isSearching ? "..." : "Go"}

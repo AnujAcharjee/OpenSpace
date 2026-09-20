@@ -13,6 +13,7 @@ import type {
 import type { RoomMessage } from "@/stores/app-store"
 import { toast } from "sonner"
 import axios from "axios"
+import { wsClient } from "@/ws"
 
 const EMPTY_ROOM_MESSAGES: RoomMessage[] = []
 const toastOptions = { position: "top-center" as const }
@@ -85,6 +86,7 @@ function useMessages(room: RoomRecord | null, userId: string | undefined) {
 
   useEffect(() => {
     if (!roomId || !userId) return
+    wsClient.joinRoom(roomId)
     let isCancelled = false
 
     const load = async () => {

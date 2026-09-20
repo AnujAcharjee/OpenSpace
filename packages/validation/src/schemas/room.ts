@@ -71,8 +71,9 @@ export const searchRoomsSchema = z.object({
     name: z
       .string({ message: 'name must be a string' })
       .trim()
-      .min(1, { message: 'name is required' })
-      .max(100, { message: 'name must be at most 100 characters' }),
+      .max(100, { message: 'name must be at most 100 characters' })
+      .optional()
+      .default(''),
   }),
 });
 

@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import type { RequestJoinRoomRequest as RequestJoinRoomInput } from '@repo/validation';
 import crypto from 'crypto';
 import { prisma, RoomMemberRole, JoinRequestStatus } from '@repo/db';
+import { redis } from '../../lib/redis.js';
 import { toRoomRecord } from '../@helpers.js';
 import { AppError } from '../../utils/appError.js';
 
@@ -55,6 +56,13 @@ export const requestJoinRoomController = async (req: Request, res: Response) => 
         role: RoomMemberRole.MEMBER,
       },
     });
+
+    try {
+      await redis.sadd(`room:${roomId}:members`, userId);
+      await redis.expire(`room:${roomId}:members`, 86400);
+    } catch {
+      // Non-blocking cache update
+    }
 
     const updatedRoom = await prisma.chatRoom.findUnique({
       where: { id: roomId },
