@@ -38,16 +38,9 @@ export const useHydrate = (userid: string) => {
       })
     } catch (error) {
       resetAppState()
-      console.error("Error while fetching user: ", error)
-
-      if (axios.isAxiosError(error) && error.response?.status === 401) {
-        router.replace("/auth")
-        return
-      }
-
-      throw error
+      console.warn("User is not authenticated or hydrate failed:", error)
     }
-  }, [hydrateUserState, resetAppState, router, userid])
+  }, [hydrateUserState, resetAppState])
 
   return { hasHydrated, fetch, user, rooms }
 }

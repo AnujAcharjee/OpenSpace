@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import useAppStore from "@/stores/app-store"
 import { Card, CardContent, CardHeader, CardFooter } from "@/components/ui/card"
@@ -88,6 +89,7 @@ const editRoomFormSchema = z.object({
 })
 
 export default function ChatSection({ room }: { room: RoomRecord | null }) {
+  const router = useRouter()
   const {
     user,
     setActiveRoom,
@@ -114,6 +116,55 @@ export default function ChatSection({ room }: { room: RoomRecord | null }) {
   } = useChatSection(room)
 
   if (!room) {
+    if (!user) {
+      return (
+        <div className="h-full w-full p-1.5">
+          <Card className="flex h-full w-full flex-col items-center justify-center border border-border/40 bg-card/40 backdrop-blur-md rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.03)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.15)] p-6 text-center">
+            <div className="flex flex-col items-center max-w-md space-y-6">
+              <div className="relative flex items-center justify-center py-2">
+                <div className="pointer-events-none absolute -inset-6 rounded-full bg-[radial-gradient(circle,rgba(244,208,63,0.15)_0%,rgba(212,175,55,0.05)_55%,transparent_70%)] blur-2xl" />
+                <AppIcon size="lg" />
+              </div>
+
+              <div className="space-y-2">
+                <h2 className="text-2xl font-bold tracking-tight text-foreground">
+                  Welcome to Collab
+                </h2>
+                <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
+                  Real-time collaborative workspaces, channels, and direct messaging powered by secure Pramaan identity.
+                </p>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-center gap-3 w-full justify-center">
+                <Button
+                  size="lg"
+                  className="w-full sm:w-auto h-11 px-8 rounded-xl font-semibold shadow-[0_0_20px_rgba(244,187,68,0.25)] hover:shadow-[0_0_25px_rgba(244,187,68,0.45)] cursor-pointer"
+                  onClick={() => router.push("/auth")}
+                >
+                  Sign In / Sign Up
+                </Button>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3 w-full pt-4 border-t border-border/40 text-center">
+                <div className="space-y-1">
+                  <div className="text-xs font-semibold text-foreground">⚡ Real-time</div>
+                  <div className="text-[10px] text-muted-foreground">Instant messaging</div>
+                </div>
+                <div className="space-y-1">
+                  <div className="text-xs font-semibold text-foreground">🔒 Protected</div>
+                  <div className="text-[10px] text-muted-foreground">Pramaan Auth</div>
+                </div>
+                <div className="space-y-1">
+                  <div className="text-xs font-semibold text-foreground">🌐 Channels</div>
+                  <div className="text-[10px] text-muted-foreground">Public & Private</div>
+                </div>
+              </div>
+            </div>
+          </Card>
+        </div>
+      )
+    }
+
     return (
       <div className="h-full w-full p-1.5">
         <Card className="flex h-full w-full flex-col items-center justify-center border border-border/40 bg-card/40 backdrop-blur-md rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.03)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.15)] p-6 text-center">
@@ -125,7 +176,7 @@ export default function ChatSection({ room }: { room: RoomRecord | null }) {
 
             <div className="space-y-1">
               <h2 className="text-lg font-bold tracking-tight text-foreground">
-                Welcome to Collab
+                Welcome back{user?.name ? `, ${user.name}` : user?.username ? `, ${user.username}` : ""}!
               </h2>
               <p className="text-xs text-muted-foreground leading-relaxed">
                 Select a channel from the sidebar or search to start collaborating.
@@ -259,79 +310,94 @@ export default function ChatSection({ room }: { room: RoomRecord | null }) {
 
         {!showMembersPanel && (
           <CardFooter className="flex gap-2 px-3 py-3">
-            <form
-              className="flex w-full items-end gap-1.5"
-              onSubmit={(e) => {
-                e.preventDefault()
-                void sendMessage()
-              }}
-            >
-              <div className="flex flex-1 flex-col gap-1.5">
-                {replyingTo && (
-                  <div className="flex items-start justify-between rounded-xl border border-primary/40 bg-muted/30 px-2.5 py-1.5">
-                    <div className="min-w-0 border-l-2 border-primary/70 pl-3">
-                      <div className="text-xs font-medium text-primary">
-                        Replying to {getAuthorName(replyingTo)}
+            {!user ? (
+              <div className="flex w-full items-center justify-between gap-3 rounded-xl border border-border/50 bg-muted/40 px-4 py-2.5">
+                <span className="text-xs text-muted-foreground">
+                  Sign in to participate and send messages in {room.name}
+                </span>
+                <Button
+                  size="sm"
+                  className="h-8 shrink-0 rounded-lg px-3 text-xs font-semibold cursor-pointer"
+                  onClick={() => router.push("/auth")}
+                >
+                  Sign In
+                </Button>
+              </div>
+            ) : (
+              <form
+                className="flex w-full items-end gap-1.5"
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  void sendMessage()
+                }}
+              >
+                <div className="flex flex-1 flex-col gap-1.5">
+                  {replyingTo && (
+                    <div className="flex items-start justify-between rounded-xl border border-primary/40 bg-muted/30 px-2.5 py-1.5">
+                      <div className="min-w-0 border-l-2 border-primary/70 pl-3">
+                        <div className="text-xs font-medium text-primary">
+                          Replying to {getAuthorName(replyingTo)}
+                        </div>
+                        <div className="line-clamp-2 text-xs text-muted-foreground">
+                          {getMessageBody(replyingTo)}
+                        </div>
                       </div>
-                      <div className="line-clamp-2 text-xs text-muted-foreground">
-                        {getMessageBody(replyingTo)}
-                      </div>
+                      <button
+                        type="button"
+                        onClick={clearReply}
+                        className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+                        aria-label="Cancel reply"
+                      >
+                        <IconX size={16} />
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={clearReply}
-                      className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
-                      aria-label="Cancel reply"
-                    >
-                      <IconX size={16} />
-                    </button>
-                  </div>
-                )}
+                  )}
 
-                <InputGroup className="h-9 w-full border border-primary/50">
-                  <InputGroupInput
-                    value={draft}
-                    onChange={(e) => setDraft(e.target.value)}
-                    placeholder={`Message ${room.name}`}
-                    disabled={!user || isSending}
+                  <InputGroup className="h-9 w-full border border-primary/50">
+                    <InputGroupInput
+                      value={draft}
+                      onChange={(e) => setDraft(e.target.value)}
+                      placeholder={`Message ${room.name}`}
+                      disabled={!user || isSending}
+                    />
+                    <InputGroupAddon>
+                      <IconPaperclip
+                        stroke={2}
+                        height={20}
+                        width={20}
+                        className="cursor-not-allowed text-muted-foreground/60"
+                      />
+                      <IconMoodSmile
+                        stroke={2}
+                        height={20}
+                        width={20}
+                        className="cursor-not-allowed text-muted-foreground/60"
+                      />
+                    </InputGroupAddon>
+                    <InputGroupAddon align="inline-end">
+                      <InputGroupButton
+                        type="submit"
+                        variant="ghost"
+                        size="icon-sm"
+                        disabled={!user || !draft.trim() || isSending}
+                        className="text-muted-foreground hover:text-foreground"
+                      >
+                        <IconBrandTelegram stroke={2} height={18} width={18} />
+                      </InputGroupButton>
+                    </InputGroupAddon>
+                  </InputGroup>
+                </div>
+
+                <div className="rounded-full border border-border/50 bg-muted/30 p-1">
+                  <IconMicrophone
+                    stroke={2}
+                    height={20}
+                    width={20}
+                    className="cursor-not-allowed text-muted-foreground/60"
                   />
-                  <InputGroupAddon>
-                    <IconPaperclip
-                      stroke={2}
-                      height={20}
-                      width={20}
-                      className="cursor-not-allowed text-muted-foreground/60"
-                    />
-                    <IconMoodSmile
-                      stroke={2}
-                      height={20}
-                      width={20}
-                      className="cursor-not-allowed text-muted-foreground/60"
-                    />
-                  </InputGroupAddon>
-                  <InputGroupAddon align="inline-end">
-                    <InputGroupButton
-                      type="submit"
-                      variant="ghost"
-                      size="icon-sm"
-                      disabled={!user || !draft.trim() || isSending}
-                      className="text-muted-foreground hover:text-foreground"
-                    >
-                      <IconBrandTelegram stroke={2} height={18} width={18} />
-                    </InputGroupButton>
-                  </InputGroupAddon>
-                </InputGroup>
-              </div>
-
-              <div className="rounded-full border border-border/50 bg-muted/30 p-1">
-                <IconMicrophone
-                  stroke={2}
-                  height={20}
-                  width={20}
-                  className="cursor-not-allowed text-muted-foreground/60"
-                />
-              </div>
-            </form>
+                </div>
+              </form>
+            )}
           </CardFooter>
         )}
       </Card>

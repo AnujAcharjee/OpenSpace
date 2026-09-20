@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, type CSSProperties, type FormEvent, useRef } from "react"
+import { useRouter } from "next/navigation"
 import { Fragment } from "react/jsx-runtime"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
@@ -72,6 +73,7 @@ const toastOptions = {
 }
 
 export default function RoomsSection() {
+  const router = useRouter()
   const { activeRoom, rooms, user, setActiveRoom, upsertRoom } = useAppStore(
     useShallow((state) => ({
       activeRoom: state.activeRoom,
@@ -93,10 +95,6 @@ export default function RoomsSection() {
   const [pendingJoinRoomIds, setPendingJoinRoomIds] = useState<
     Record<string, true>
   >({})
-
-  if (!user) {
-    return null
-  }
 
   const isSearchMode = hasSearched
   const displayedRooms = isSearchMode ? searchResults : rooms
@@ -141,7 +139,13 @@ export default function RoomsSection() {
   }
 
   async function handleJoinRoom(room: RoomRecord) {
-    if (!user || joiningRoomId) {
+    if (!user) {
+      toast.info("Please sign in to join rooms", toastOptions)
+      router.push("/auth")
+      return
+    }
+
+    if (joiningRoomId) {
       return
     }
 
@@ -182,9 +186,24 @@ export default function RoomsSection() {
     <div className="h-full w-full p-1.5">
       <Card className="flex h-full w-full flex-col border border-border/40 bg-card/50 shadow-[0_8px_30px_rgb(0,0,0,0.03)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] backdrop-blur-md rounded-2xl p-0 overflow-hidden">
         <CardHeader className="flex flex-col gap-3 border-b border-border/50 px-4 py-3 bg-card/40 backdrop-blur-sm w-full">
-          <CardTitle className="flex w-full items-center justify-between gap-4">
+          <CardTitle className="flex w-full items-center justify-between gap-2">
             <AppIcon />
-            <DialogSettings />
+            {user ? (
+              <DialogSettings />
+            ) : (
+              <div className="flex items-center gap-1.5">
+                <Button
+                  type="button"
+                  variant="default"
+                  size="sm"
+                  className="h-7 rounded-lg px-2.5 text-xs font-semibold cursor-pointer shadow-[0_0_10px_rgba(244,187,68,0.3)] hover:shadow-[0_0_14px_rgba(244,187,68,0.5)]"
+                  onClick={() => router.push("/auth")}
+                >
+                  Sign In
+                </Button>
+                <ThemeToggleButton className="h-7 w-7" />
+              </div>
+            )}
           </CardTitle>
 
           <CardDescription className="w-full">
@@ -221,7 +240,27 @@ export default function RoomsSection() {
                 {isSearching ? "..." : "Go"}
               </button>
               <Separator orientation="vertical" decorative />
-              <DialogCreateRoom creatorId={user.id} />
+              {user ? (
+                <DialogCreateRoom creatorId={user.id} />
+              ) : (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        toast.info("Please sign in to create a room", toastOptions)
+                        router.push("/auth")
+                      }}
+                      className="flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center rounded-full border border-border/80 bg-background text-base leading-none text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    >
+                      +
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Sign in to create a room</p>
+                  </TooltipContent>
+                </Tooltip>
+              )}
             </form>
           </CardDescription>
         </CardHeader>
@@ -243,11 +282,30 @@ export default function RoomsSection() {
                 </div>
               )}
 
-              {!isSearching && displayedRooms.length === 0 && (
+              {!isSearching && !isSearchMode && !user && displayedRooms.length === 0 && (
+                <div className="my-2 rounded-xl border border-dashed border-border/80 bg-card/40 p-4 text-center backdrop-blur-sm">
+                  <div className="mb-1 text-xs font-semibold text-foreground">
+                    Collaborate with Collab
+                  </div>
+                  <p className="mb-3 text-[11px] leading-relaxed text-muted-foreground">
+                    Sign in with Pramaan to see your channels, or search for public rooms above.
+                  </p>
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="h-8 w-full rounded-lg text-xs font-semibold cursor-pointer"
+                    onClick={() => router.push("/auth")}
+                  >
+                    Sign In / Sign Up
+                  </Button>
+                </div>
+              )}
+
+              {!isSearching && displayedRooms.length === 0 && (isSearchMode || user) && (
                 <div className="rounded-lg border border-dashed border-border/70 px-3 py-6 text-center text-sm text-muted-foreground">
                   {isSearchMode
                     ? "No rooms found with that name."
-                    : "No rooms available."}
+                    : "No rooms available. Create or join one!"}
                 </div>
               )}
 
@@ -258,7 +316,7 @@ export default function RoomsSection() {
                     room={room}
                     isActive={activeRoom === room.id}
                     onSelect={handleRoomSelect}
-                    currentUserId={user.id}
+                    currentUserId={user?.id ?? null}
                     isSearchMode={isSearchMode}
                     onJoinRoom={handleJoinRoom}
                     isJoining={joiningRoomId === room.id}
@@ -268,21 +326,6 @@ export default function RoomsSection() {
             </div>
           </ScrollArea>
         </CardContent>
-
-        {/* <CardFooter className="flex items-center justify-between gap-2 bg-primary/80 px-4 py-2 text-primary-foreground">
-          <div className="flex min-w-0 items-center gap-2">
-            <Avatar className="h-7 w-7 border border-border">
-              <AvatarImage
-                src={user.avatarUrl ? user.avatarUrl : undefined}
-                alt={user.username}
-              />
-              <AvatarFallback>{user.username[0]}</AvatarFallback>
-              <AvatarBadge className="right-0.5 bottom-0.5 h-2.5 w-2.5 border-[1.5px] border-background bg-green-500" />
-            </Avatar>
-            <span className="truncate text-sm">{user.username}</span>
-          </div>
-          <ThemeToggleButton className="text-primary-foreground/80 hover:bg-primary-foreground/10 hover:text-primary-foreground" />
-        </CardFooter> */}
       </Card>
     </div>
   )
@@ -301,15 +344,15 @@ function ListItems({
   room: RoomRecord
   isActive: boolean
   onSelect: (room: RoomRecord) => void
-  currentUserId: string
+  currentUserId: string | null
   isSearchMode: boolean
   onJoinRoom: (room: RoomRecord) => Promise<void>
   isJoining: boolean
   hasPendingRequest: boolean
 }) {
-  const isMember = room.members.some(
-    (member) => member.userId === currentUserId
-  )
+  const isMember = currentUserId
+    ? room.members.some((member) => member.userId === currentUserId)
+    : false
   const isPinned = useAppStore(
     (state) => state.roomUiOptions[room.id]?.pinned ?? false
   )

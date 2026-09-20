@@ -173,7 +173,7 @@ function useSendMessage(
 
   async function sendMessage() {
     const text = draft.trim()
-    if (!text || isSending) return
+    if (!text || isSending || !userId) return
     setIsSending(true)
 
     try {
