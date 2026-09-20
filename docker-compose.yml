@@ -1,25 +1,117 @@
 services:
-  redis:
-    image: redis:7-alpine
-    container_name: collab_redis
-    command: redis-server --appendonly yes
-    ports:
-      - "6379:6379"
-    volumes:
-      - collab_redis_data:/data
+  # ─── Caddy Reverse Proxy & Automatic SSL ────────────────────────────────────
+  caddy:
+    image: caddy:2-alpine
+    container_name: collab_caddy
     restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      - API_DOMAIN=${API_DOMAIN:-localhost}
+      - ACME_EMAIL=${ACME_EMAIL:-admin@example.com}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api-gateway
+    networks:
+      - collab_net
 
-  postgres:
-    image: postgres:16-alpine
-    container_name: collab_postgres
-    env_file:
-      - .env.development.local
-    ports:
-      - "5432:5432"
-    volumes:
-      - collab_postgres_data:/var/lib/postgresql/data
+  # ─── API Gateway Service (:3005) ───────────────────────────────────────────
+  api-gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        APP_NAME: api-gateway
+    container_name: collab_api_gateway
     restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PORT=3005
+      - HTTP_SERVICE_URL=http://http-service:3001
+      - CHAT_SERVICE_URL=http://chat-service:3000
+      - WS_SERVICE_URL=ws://ws-service:3002
+      - REDIS_URL=${REDIS_URL}
+      - JWT_SECRET=${JWT_SECRET}
+      - WEB_APP_URL=${WEB_APP_URL}
+      - GATEWAY_INTERNAL_SECRET=${GATEWAY_INTERNAL_SECRET}
+      - ACCESS_TOKEN_COOKIE_NAME=${ACCESS_TOKEN_COOKIE_NAME:-collab_token}
+    depends_on:
+      - http-service
+      - chat-service
+      - ws-service
+    networks:
+      - collab_net
+
+  # ─── HTTP Service (:3001) ──────────────────────────────────────────────────
+  http-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        APP_NAME: http-service
+    container_name: collab_http_service
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+      - JWT_SECRET=${JWT_SECRET}
+      - WEB_APP_URL=${WEB_APP_URL}
+      - GATEWAY_INTERNAL_SECRET=${GATEWAY_INTERNAL_SECRET}
+      - ACCESS_TOKEN_COOKIE_NAME=${ACCESS_TOKEN_COOKIE_NAME:-collab_token}
+      - PRAMAAN_CLIENT_ID=${PRAMAAN_CLIENT_ID}
+      - PRAMAAN_SECRET=${PRAMAAN_SECRET}
+      - CALLBACK_URL=${CALLBACK_URL}
+      - PRAMAAN_SERVER_URL=${PRAMAAN_SERVER_URL}
+    networks:
+      - collab_net
+
+  # ─── Chat Service & StreamWorker (:3000) ───────────────────────────────────
+  chat-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        APP_NAME: chat-service
+    container_name: collab_chat_service
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+      - GATEWAY_INTERNAL_SECRET=${GATEWAY_INTERNAL_SECRET}
+    networks:
+      - collab_net
+
+  # ─── WebSocket Service (:3002) ─────────────────────────────────────────────
+  ws-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        APP_NAME: ws-service
+    container_name: collab_ws_service
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PORT=3002
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+      - GATEWAY_INTERNAL_SECRET=${GATEWAY_INTERNAL_SECRET}
+    networks:
+      - collab_net
+
+networks:
+  collab_net:
+    driver: bridge
 
 volumes:
-  collab_redis_data:
-  collab_postgres_data:
+  caddy_data:
+  caddy_config:

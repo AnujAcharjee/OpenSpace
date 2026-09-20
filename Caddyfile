@@ -1,0 +1,19 @@
+{
+    # Global options
+    email {$ACME_EMAIL:admin@example.com}
+}
+
+# Backend API Gateway (HTTP REST & WebSocket reverse proxy)
+{$API_DOMAIN:localhost} {
+    # Proxy all traffic to API Gateway container
+    reverse_proxy api-gateway:3005 {
+        # Enable streaming and WebSocket support
+        flush_interval -1
+    }
+
+    # Logging
+    log {
+        output stdout
+        format console
+    }
+}
