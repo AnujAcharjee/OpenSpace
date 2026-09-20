@@ -1,6 +1,14 @@
+x-logging: &default-logging
+  logging:
+    driver: "json-file"
+    options:
+      max-size: "10m"
+      max-file: "3"
+
 services:
   # ─── Caddy Reverse Proxy & Automatic SSL ────────────────────────────────────
   caddy:
+    <<: *default-logging
     image: caddy:2-alpine
     container_name: collab_caddy
     restart: unless-stopped
@@ -22,6 +30,7 @@ services:
 
   # ─── API Gateway Service (:3005) ───────────────────────────────────────────
   api-gateway:
+    <<: *default-logging
     build:
       context: .
       dockerfile: Dockerfile
@@ -49,6 +58,7 @@ services:
 
   # ─── HTTP Service (:3001) ──────────────────────────────────────────────────
   http-service:
+    <<: *default-logging
     build:
       context: .
       dockerfile: Dockerfile
@@ -74,6 +84,7 @@ services:
 
   # ─── Chat Service & StreamWorker (:3000) ───────────────────────────────────
   chat-service:
+    <<: *default-logging
     build:
       context: .
       dockerfile: Dockerfile
@@ -92,6 +103,7 @@ services:
 
   # ─── WebSocket Service (:3002) ─────────────────────────────────────────────
   ws-service:
+    <<: *default-logging
     build:
       context: .
       dockerfile: Dockerfile

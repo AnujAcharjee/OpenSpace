@@ -84,5 +84,6 @@ jobs:
             # Build and start all 4 microservices + Caddy in detached mode
             docker compose up -d --build --remove-orphans
 
-            # Clean up old dangling images to save free tier disk space
-            docker image prune -f
+            # Aggressively clean old images and build cache to keep disk usage minimal (< 1.5 GB)
+            docker image prune -af --filter "until=24h" || true
+            docker builder prune -af --filter "until=24h" || true
