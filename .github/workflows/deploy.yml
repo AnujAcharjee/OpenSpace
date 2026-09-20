@@ -62,7 +62,12 @@ jobs:
               git clone https://github.com/${{ github.repository }}.git $HOME/Collab
             fi
 
-            cd $HOME/Collab/monorepo
+            # Navigate to project root directory
+            if [ -d "$HOME/Collab/monorepo" ]; then
+              cd "$HOME/Collab/monorepo"
+            else
+              cd "$HOME/Collab"
+            fi
 
             # Pull latest code from main
             git fetch origin main
