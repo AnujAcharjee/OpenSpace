@@ -176,10 +176,20 @@ export async function startWebSocketServer(): Promise<WebSocketServer> {
           ws.isAlive = true;
         });
 
-        await redis.set(
-          userToWssMapKey(ws.user.id),
-          JSON.stringify({ sid: ws.sessionId, uid: ws.user.id, srv: process.env.INSTANCE_NAME }),
-        );
+        const sessionData = JSON.stringify({
+          sid: ws.sessionId,
+          uid: ws.user.id,
+          srv: process.env.INSTANCE_NAME || 'ws-node',
+          connectedAt: new Date().toISOString(),
+        });
+
+        const userSessionsKey = `ws:user:${ws.user.id}:sessions`;
+
+        await redis.hset(userSessionsKey, ws.sessionId, sessionData);
+        await redis.expire(userSessionsKey, 86400);
+
+        // Maintain legacy presence key for backward compatibility
+        await redis.set(userToWssMapKey(ws.user.id), sessionData);
 
         await subscriptionManager.registerClient(ws);
 
@@ -204,8 +214,14 @@ export async function startWebSocketServer(): Promise<WebSocketServer> {
           try {
             await subscriptionManager.unregisterClient(ws);
 
-            // del user session from ws map
-            await redis.del(userToWssMapKey(ws.user.id));
+            // Remove this specific tab session from user sessions hash
+            await redis.hdel(userSessionsKey, ws.sessionId);
+            const remainingSessions = await redis.hlen(userSessionsKey);
+
+            if (remainingSessions === 0) {
+              await redis.del(userToWssMapKey(ws.user.id));
+              await redis.del(userSessionsKey);
+            }
 
             logger.info(
               {
