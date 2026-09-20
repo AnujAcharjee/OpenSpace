@@ -18,7 +18,7 @@ COPY apps ./apps
 RUN pnpm install --frozen-lockfile
 
 # Generate Prisma Client singleton
-RUN pnpm --filter @repo/db prisma generate
+RUN pnpm --filter @repo/db exec prisma generate
 
 # Build all backend TypeScript packages & microservices (skipping web)
 RUN pnpm turbo run build --filter=!web

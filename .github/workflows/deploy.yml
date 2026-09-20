@@ -32,7 +32,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Generate Prisma Client
-        run: pnpm --filter @repo/db prisma generate
+        run: pnpm --filter @repo/db exec prisma generate
 
       - name: Run Automated Tests
         run: pnpm test
