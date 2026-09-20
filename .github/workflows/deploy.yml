@@ -4,6 +4,11 @@ on:
   push:
     branches:
       - main
+    paths-ignore:
+      - 'apps/web/**'
+      - '**/*.md'
+      - '.gitignore'
+      - '.prettier*'
 
 jobs:
   test:
