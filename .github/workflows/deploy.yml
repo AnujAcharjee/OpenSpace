@@ -49,8 +49,12 @@ jobs:
           script: |
             set -e
 
-            # Navigate to project directory (adjust path if cloned elsewhere)
-            cd ~/Collab/monorepo || cd ~/monorepo
+            # Auto-clone repo if it does not exist yet
+            if [ ! -d "$HOME/Collab" ]; then
+              git clone https://github.com/${{ github.repository }}.git $HOME/Collab
+            fi
+
+            cd $HOME/Collab/monorepo
 
             # Pull latest code from main
             git fetch origin main
