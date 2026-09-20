@@ -8,7 +8,7 @@ import { useShallow } from "zustand/react/shallow"
 import { usersApiUrl } from "@/constants/apiUrls"
 import { useRouter } from "next/navigation"
 
-export const useHydrate = (userid: string) => {
+export const useHydrate = (userid?: string) => {
   const router = useRouter()
   const { user, rooms, hasHydrated, hydrateUserState, resetAppState } =
     useAppStore(

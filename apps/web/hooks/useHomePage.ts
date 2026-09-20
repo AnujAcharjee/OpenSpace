@@ -5,11 +5,19 @@ import useAppStore from "@/stores/app-store"
 import { useHydrate } from "@/hooks/useHydrate"
 
 export function useHomePage() {
-  const { userid } = useParams<{ userid: string }>()
-  const { hasHydrated, fetch, user, rooms } = useHydrate(userid)
+  const params = useParams<{ userid?: string; username?: string }>()
+  const rawParam = params?.username ?? params?.userid ?? ""
+  const cleanUsername = rawParam ? decodeURIComponent(rawParam).replace(/^@+/, "") : ""
+
+  const { hasHydrated, fetch, user, rooms } = useHydrate()
 
   const activeRoomId = useAppStore((s) => s.activeRoom)
-  const isCurrentUser = user?.id === userid
+  const isCurrentUser = Boolean(
+    user &&
+      (!cleanUsername ||
+        user.username.toLowerCase() === cleanUsername.toLowerCase() ||
+        user.id === cleanUsername)
+  )
 
   const storeRooms = useAppStore((s) => s.rooms)
   const activeRoom =
@@ -18,7 +26,8 @@ export function useHomePage() {
     null
 
   return {
-    userid,
+    userid: user?.id,
+    username: cleanUsername,
     hasHydrated,
     fetch,
     user,
