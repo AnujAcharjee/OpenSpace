@@ -2,7 +2,7 @@ import type { Request, Response } from 'express';
 import type { CreateMessageInput } from '@repo/validation';
 import { v4 as uuidv4 } from 'uuid';
 import { prisma, MessageType } from '@repo/db';
-import { getRoomMemberIds, toChatMessageRecord } from './@helpers.js';
+import { isUserInRoom, toChatMessageRecord } from './@helpers.js';
 import { logger } from '../lib/logger.js';
 import { redis } from '../lib/redis.js';
 
@@ -18,8 +18,7 @@ export const createMessage = async (req: Request, res: Response) => {
   }
 
   try {
-    const receivers = await getRoomMemberIds(roomId);
-    const isRoomMember = receivers.includes(sender);
+    const isRoomMember = await isUserInRoom(roomId, sender);
 
     if (!isRoomMember) {
       return res.status(403).json({

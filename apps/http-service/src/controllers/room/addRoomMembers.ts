@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import type { AddRoomMembersRequest as AddRoomMembersInput } from '@repo/validation';
 import crypto from 'crypto';
 import { prisma, RoomMemberRole } from '@repo/db';
+import { redis } from '../../lib/redis.js';
 import { toRoomRecord } from '../@helpers.js';
 import { AppError } from '../../utils/appError.js';
 
@@ -37,6 +38,13 @@ export const addRoomMembers = async (req: Request, res: Response) => {
       })),
       skipDuplicates: true,
     });
+
+    try {
+      await redis.sadd(`room:${roomId}:members`, ...users.map((u) => u.id));
+      await redis.expire(`room:${roomId}:members`, 86400);
+    } catch (err) {
+      // Non-blocking cache update
+    }
   }
 
   const updatedRoom = await prisma.chatRoom.findUnique({

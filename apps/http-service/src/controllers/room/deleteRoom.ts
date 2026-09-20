@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import type { DeleteRoomRequest as DeleteRoomInput } from '@repo/validation';
 import { prisma, Prisma } from '@repo/db';
+import { redis } from '../../lib/redis.js';
 import { AppError } from '../../utils/appError.js';
 
 export const deleteRoom = async (req: Request, res: Response) => {
@@ -10,6 +11,12 @@ export const deleteRoom = async (req: Request, res: Response) => {
     await prisma.chatRoom.delete({
       where: { id },
     });
+
+    try {
+      await redis.del(`room:${id}:members`);
+    } catch {
+      // Non-blocking cache eviction
+    }
 
     return res.status(200).json({
       success: true,

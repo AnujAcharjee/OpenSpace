@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import type { RespondJoinRequestRequest as RespondJoinRequestInput } from '@repo/validation';
 import crypto from 'crypto';
 import { prisma, RoomMemberRole } from '@repo/db';
+import { redis } from '../../lib/redis.js';
 import { toRoomRecord } from '../@helpers.js';
 import { AppError } from '../../utils/appError.js';
 
@@ -67,6 +68,13 @@ export const respondJoinRequestController = async (req: Request, res: Response) 
         where: { id: requestId },
       }),
     ]);
+
+    try {
+      await redis.sadd(`room:${joinRequest.roomId}:members`, joinRequest.userId);
+      await redis.expire(`room:${joinRequest.roomId}:members`, 86400);
+    } catch (err) {
+      // Non-blocking cache update
+    }
   } else {
     await prisma.chatRoomJoinRequest.delete({
       where: { id: requestId },

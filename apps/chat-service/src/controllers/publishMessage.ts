@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import { getRoomMemberIds } from './@helpers.js';
+import { isUserInRoom } from './@helpers.js';
 import { logger } from '../lib/logger.js';
 import { redis } from '../lib/redis.js';
 
@@ -29,8 +29,7 @@ export const publishMessage = async (req: Request, res: Response) => {
   };
 
   try {
-    const receivers = await getRoomMemberIds(chatMessagePayload.roomId);
-    const isRoomMember = receivers.includes(chatMessagePayload.sender);
+    const isRoomMember = await isUserInRoom(chatMessagePayload.roomId, chatMessagePayload.sender);
 
     if (!isRoomMember) {
       return res.status(403).json({
@@ -38,8 +37,6 @@ export const publishMessage = async (req: Request, res: Response) => {
         error: 'You are no longer a member of this room',
       });
     }
-
-    logger.debug(receivers, 'Message Receivers');
 
     const roomChannel = `room:${chatMessagePayload.roomId}`;
 

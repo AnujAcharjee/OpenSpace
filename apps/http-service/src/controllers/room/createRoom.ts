@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import type { CreateRoomInput } from '@repo/validation';
 import crypto from 'crypto';
 import { prisma } from '@repo/db';
+import { redis } from '../../lib/redis.js';
 import { toRoomRecord } from '../@helpers.js';
 
 export const createRoom = async (req: Request, res: Response) => {
@@ -41,6 +42,13 @@ export const createRoom = async (req: Request, res: Response) => {
       },
     },
   });
+
+  try {
+    await redis.sadd(`room:${roomId}:members`, creatorId);
+    await redis.expire(`room:${roomId}:members`, 86400);
+  } catch (err) {
+    // Non-blocking cache update
+  }
 
   return res.status(201).json({
     success: true,

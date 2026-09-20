@@ -86,6 +86,9 @@ export const removeRoomMember = async (req: Request, res: Response) => {
 
       await redis.publish(`user:${removedMember.userId}`, JSON.stringify(removalPayload));
       await redis.publish(`room:${roomId}`, JSON.stringify(removalPayload));
+
+      // 3. Evict from Redis membership cache
+      await redis.srem(`room:${roomId}:members`, removedMember.userId);
     } catch (publishError) {
       logger.error({ publishError, roomId, memberId }, 'Room member removed but WS publish failed');
     }
