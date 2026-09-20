@@ -1,141 +1,27 @@
 import type { Request, Response } from 'express';
 import crypto from 'crypto';
+import type { AuthorizationTransaction } from '@anuj304/pramaan';
 import { prisma, Prisma } from '@repo/db';
 import { auth, type ProviderProfile } from '../../lib/auth.js';
+import { pramaan } from '../../lib/pramaan.js';
 import { redis } from '../../lib/redis.js';
 import { logger } from '../../lib/logger.js';
 import { toUserRecord } from '../@helpers.js';
 
-const PRAMAAN_SERVER_URL = process.env.PRAMAAN_SERVER_URL ?? 'https://pramaan.anujacharjee.com';
-const API_GATEWAY_URL = process.env.API_GATEWAY_URL ?? `http://localhost:3005`;
 const WEB_APP_URL = process.env.WEB_APP_URL ?? 'http://localhost:3000';
-const CLIENT_ID =
-  process.env.PRAMAAN_CLIENT_ID ??
-  (() => {
-    throw new Error('PRAMAAN_CLIENT_ID is not set');
-  })();
-const CLIENT_SECRET =
-  process.env.PRAMAAN_CLIENT_SECRET ??
-  (() => {
-    throw new Error('PRAMAAN_CLIENT_SECRET is not set');
-  })();
-const CALLBACK_URL =
-  process.env.CALLBACK_URL ?? `${API_GATEWAY_URL}/api/v1/auth/pramaan/callback`;
 const ACCESS_TOKEN_COOKIE_NAME = process.env.ACCESS_TOKEN_COOKIE_NAME?.trim() || 'accessToken';
+const PRAMAAN_TX_COOKIE_NAME = 'pramaan_tx';
 const ACCESS_TOKEN_TTL_SECONDS = 60 * 60 * 24 * 7;
 const OAUTH_STATE_TTL_SECONDS = 60 * 10;
 
 type AuthMode = 'signin' | 'signup';
 
-type StoredOAuthState = {
-  state: string;
-  nonce: string;
-  codeVerifier: string;
+type StoredOAuthTransaction = AuthorizationTransaction & {
   mode: AuthMode;
 };
 
-type TokenExchangeResponse = {
-  accessToken?: string;
-  idToken?: string;
-};
-
-type RawTokenApiResponse = {
-  success: boolean;
-  message?: string;
-  data: TokenExchangeResponse;
-};
-
-type NormalizedTokenExchangeResponse = {
-  accessToken?: string;
-  tokenType?: string;
-  expiresIn?: number;
-  refreshToken?: string;
-  idToken?: string;
-  scope?: string;
-};
-
-type RawApiResponse = {
-  success: boolean;
-  message?: string;
-  data: ProviderProfile;
-};
-
-function buildAuthorizationUrl(state: string, nonce: string, codeChallenge: string): string {
-  const authUrl = new URL(`${PRAMAAN_SERVER_URL}/api/oauth/authorize`);
-
-  authUrl.searchParams.set('response_type', 'code');
-  authUrl.searchParams.set('client_id', CLIENT_ID);
-  authUrl.searchParams.set('redirect_uri', CALLBACK_URL);
-  authUrl.searchParams.set('scope', 'openid profile email');
-  authUrl.searchParams.set('state', state);
-  authUrl.searchParams.set('nonce', nonce);
-  authUrl.searchParams.set('code_challenge', codeChallenge);
-  authUrl.searchParams.set('code_challenge_method', 'S256');
-
-  return authUrl.toString();
-}
-
-async function exchangeCodeForTokens(code: string, codeVerifier: string): Promise<TokenExchangeResponse> {
-  const body = new URLSearchParams({
-    grant_type: 'authorization_code',
-    code,
-    client_id: CLIENT_ID,
-    client_secret: CLIENT_SECRET,
-    redirect_uri: CALLBACK_URL,
-    code_verifier: codeVerifier,
-  });
-
-  const response = await fetch(`${PRAMAAN_SERVER_URL}/api/oauth/token`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: body.toString(),
-  });
-
-  if (!response.ok) {
-    throw new Error('Token exchange failed');
-  }
-
-  const json = (await response.json()) as RawTokenApiResponse;
-  return json.data;
-}
-
-function normalizeTokenResponse(tokenData: TokenExchangeResponse): NormalizedTokenExchangeResponse {
-  return {
-    accessToken: tokenData.accessToken,
-    idToken: tokenData.idToken,
-  };
-}
-
 function getSingleQueryParam(value: unknown): string | null {
   return typeof value === 'string' ? value : null;
-}
-
-function generateVerifier(): string {
-  return crypto.randomBytes(32).toString('base64url');
-}
-
-function generateChallenge(verifier: string): string {
-  return crypto.createHash('sha256').update(verifier).digest('base64url');
-}
-
-function generateState(): string {
-  return crypto.randomBytes(32).toString('base64url');
-}
-
-function generateNonce(): string {
-  return crypto.randomBytes(32).toString('base64url');
-}
-
-function generateOAuthParameters(mode: AuthMode): StoredOAuthState & { codeChallenge: string } {
-  const codeVerifier = generateVerifier();
-
-  return {
-    state: generateState(),
-    nonce: generateNonce(),
-    codeVerifier,
-    codeChallenge: generateChallenge(codeVerifier),
-    mode,
-  };
 }
 
 function parseAuthMode(value: unknown): AuthMode {
@@ -171,22 +57,6 @@ function buildUsernameCandidates(payload: ProviderProfile, email: string): strin
         .map(normalizeUsername),
     ),
   ];
-}
-
-async function fetchInfo(providerUserId: string, accessToken: string): Promise<ProviderProfile> {
-  const response = await fetch(`${PRAMAAN_SERVER_URL}/api/oauth/account/${providerUserId}`, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch Pramaan profile for ${providerUserId}`);
-  }
-
-  const json = (await response.json()) as RawApiResponse;
-  return json.data;
 }
 
 async function fetchUserByEmail(email: string) {
@@ -236,7 +106,7 @@ async function ensureUserFromProfile(payload: ProviderProfile) {
     const username =
       index < usernameCandidates.length ?
         baseUsername
-      : normalizeUsername(`${baseUsername}-${crypto.randomUUID().slice(0, 8)}`);
+        : normalizeUsername(`${baseUsername}-${crypto.randomUUID().slice(0, 8)}`);
 
     try {
       return await createUserProfile({ email, username, name, avatarUrl });
@@ -265,43 +135,66 @@ function getStateRedisKey(state: string) {
   return `oauth:pramaan:${state}`;
 }
 
-async function loadStoredOAuthState(state: string): Promise<StoredOAuthState | null> {
+async function loadStoredOAuthTransaction(
+  state: string,
+  cookieTx?: string,
+): Promise<StoredOAuthTransaction | null> {
+  // 1. Try from cookie first
+  if (cookieTx) {
+    try {
+      const parsed = JSON.parse(cookieTx) as StoredOAuthTransaction;
+      if (parsed?.state === state) {
+        return parsed;
+      }
+    } catch {
+      // ignore JSON parse error, fall back to redis
+    }
+  }
+
+  // 2. Fall back to Redis
   const rawState = await redis.get(getStateRedisKey(state));
   if (!rawState) return null;
 
   try {
-    return JSON.parse(rawState) as StoredOAuthState;
+    return JSON.parse(rawState) as StoredOAuthTransaction;
   } catch {
     return null;
   }
 }
 
-export const authentication = async (req: Request, res: Response) => {  
+export const authentication = async (req: Request, res: Response) => {
   const mode = parseAuthMode(getSingleQueryParam(req.query.mode));
-  const oauthParameters = generateOAuthParameters(mode);
-  const authorizationUrl = buildAuthorizationUrl(
-    oauthParameters.state,
-    oauthParameters.nonce,
-    oauthParameters.codeChallenge,
-  );
+  
+  // 1. Generate authorization request with official SDK
+  const authReq = await pramaan.createAuthorizationRequest({
+    scope: ['openid', 'profile', 'email'],
+  });
 
-  logger.debug("Authentication got invoked")
+  const txData: StoredOAuthTransaction = {
+    ...authReq.transaction,
+    mode,
+  };
 
+  logger.debug({ mode, state: authReq.transaction.state }, 'Initiating Pramaan authentication');
+
+  // 2. Set temporary httpOnly cookie for JWT stateless flow
+  res.cookie(PRAMAAN_TX_COOKIE_NAME, JSON.stringify(txData), {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: OAUTH_STATE_TTL_SECONDS * 1000,
+    path: '/',
+  });
+
+  // 3. Also store in Redis for resilience
   await redis.set(
-    getStateRedisKey(oauthParameters.state),
-    JSON.stringify({
-      state: oauthParameters.state,
-      nonce: oauthParameters.nonce,
-      codeVerifier: oauthParameters.codeVerifier,
-      mode,
-    } satisfies StoredOAuthState),
+    getStateRedisKey(authReq.transaction.state),
+    JSON.stringify(txData),
     'EX',
     OAUTH_STATE_TTL_SECONDS,
   );
 
-  logger.debug({mode, authorizationUrl}, "Redirecting user to Pramaan for authentication")
-
-  return res.redirect(authorizationUrl);
+  return res.redirect(authReq.url);
 };
 
 export const oauthCallBack = async (req: Request, res: Response) => {
@@ -311,15 +204,18 @@ export const oauthCallBack = async (req: Request, res: Response) => {
   const providerErrorDescription = getSingleQueryParam(req.query.error_description);
   const fallbackMode = parseAuthMode(getSingleQueryParam(req.query.mode));
 
-  logger.debug({ code: Boolean(code), state: Boolean(state), providerError }, "OAuth callback got invoked");
+  logger.debug({ hasCode: Boolean(code), hasState: Boolean(state), providerError }, 'Pramaan OAuth callback received');
 
   if (!state) {
     return res.redirect(buildWebAuthUrl(fallbackMode, 'Missing state parameter'));
   }
 
-  const oauthState = await loadStoredOAuthState(state);
+  const cookieTx = typeof req.cookies?.[PRAMAAN_TX_COOKIE_NAME] === 'string' ? req.cookies[PRAMAAN_TX_COOKIE_NAME] : undefined;
+  const oauthState = await loadStoredOAuthTransaction(state, cookieTx);
   const mode = oauthState?.mode ?? fallbackMode;
 
+  // Clear temporary transaction states
+  res.clearCookie(PRAMAAN_TX_COOKIE_NAME, { path: '/' });
   await redis.del(getStateRedisKey(state));
 
   if (providerError) {
@@ -334,41 +230,49 @@ export const oauthCallBack = async (req: Request, res: Response) => {
     return res.redirect(buildWebAuthUrl(mode, 'Missing authorization code'));
   }
 
-  logger.debug({ providerUserId: Boolean(oauthState.nonce) }, "Exchanging authorization code for tokens with Pramaan");
-
   try {
-    const rawTokenData = await exchangeCodeForTokens(code, oauthState.codeVerifier);
-    const tokenData = normalizeTokenResponse(rawTokenData);
+    // 4. Handle callback using @anuj304/pramaan SDK
+    const tokens = await pramaan.handleCallback({
+      code,
+      state,
+      transaction: oauthState,
+      error: providerError ?? undefined,
+      errorDescription: providerErrorDescription ?? undefined,
+    });
 
-    logger.debug({ hasIdToken: Boolean(tokenData.idToken), hasAccessToken: Boolean(tokenData.accessToken) }, "Received token response from Pramaan");
+    logger.debug({ hasIdToken: Boolean(tokens.idToken), hasAccessToken: Boolean(tokens.accessToken) }, 'Pramaan tokens received');
 
-    if (!tokenData.idToken) {
-      return res.redirect(buildWebAuthUrl(mode, 'Pramaan did not return an ID token'));
-    }
+    let providerProfile: ProviderProfile = {};
 
-    const payload = await auth.verifyIdToken(tokenData.idToken, oauthState.nonce);
-    const providerUserId = typeof payload.sub === 'string' ? payload.sub : String(payload.sub);
-
-    let providerProfile: ProviderProfile = payload;
-
-    logger.debug({ providerUserId, hasAccessToken: Boolean(tokenData.accessToken) }, "Fetching user profile from Pramaan");
-
-    if (tokenData.accessToken) {
+    if (tokens.idToken) {
       try {
-        providerProfile = await fetchInfo(providerUserId, tokenData.accessToken);
-      } catch (error) {
-        logger.warn(
-          { err: error, providerUserId },
-          'Failed to fetch Pramaan userinfo, falling back to ID token claims',
-        );
+        const idClaims = await auth.verifyIdToken(tokens.idToken, oauthState.nonce);
+        providerProfile = { ...idClaims };
+      } catch (idErr) {
+        logger.warn({ err: idErr }, 'Could not verify ID token with local JWKS, relying on SDK validated tokens');
       }
     }
 
+    // 5. Retrieve complete user info claims if access token is present
+    if (tokens.accessToken) {
+      try {
+        const userInfo = await pramaan.getUserInfo(tokens.accessToken);
+        providerProfile = {
+          ...providerProfile,
+          ...(userInfo as unknown as ProviderProfile),
+        };
+      } catch (error) {
+        logger.warn({ err: error }, 'Failed to fetch Pramaan userInfo endpoint, falling back to ID token claims');
+      }
+    }
+
+    // 6. Match or create user record in Postgres
     const user = await ensureUserFromProfile(providerProfile);
+
+    // 7. Issue application JWT access token
     const accessToken = await auth.issueAccessToken(user);
 
-    logger.debug({ userId: user.id, accessTokenIssued: Boolean(accessToken) }, "Successfully authenticated user and issued access token");
-
+    // 8. Set application JWT in secure httpOnly cookie
     res.cookie(ACCESS_TOKEN_COOKIE_NAME, accessToken, {
       httpOnly: true,
       sameSite: 'lax',
@@ -377,11 +281,10 @@ export const oauthCallBack = async (req: Request, res: Response) => {
       path: '/',
     });
 
-    logger.debug("Redirecting user to web application after successful authentication");
-
+    logger.info({ userId: user.id }, 'User successfully authenticated via Pramaan SDK');
     return res.redirect(`${WEB_APP_URL}`);
   } catch (error) {
-    logger.error({ err: error, state }, 'Pramaan OAuth callback failed');
+    logger.error({ err: error, state }, 'Pramaan SDK callback processing failed');
     return res.redirect(buildWebAuthUrl(mode, 'Authentication failed. Please try again.'));
   }
 };

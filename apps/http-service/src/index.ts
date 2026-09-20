@@ -5,6 +5,7 @@ dotenv.config();
 dotenv.config({ path: path.resolve(process.cwd(), '../../.env') });
 
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import express, { type Request, type Response } from 'express';
 import { roomRouter } from './routes/room.js';
 import { logger } from './lib/logger.js';
@@ -26,6 +27,7 @@ app.use(
   }),
 );
 
+app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
