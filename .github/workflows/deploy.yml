@@ -1,0 +1,88 @@
+name: Deploy Backend to AWS EC2
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  test:
+    name: Run Tests & Type Checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup PNPM
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma Client
+        run: pnpm --filter @repo/db prisma generate
+
+      - name: Run Automated Tests
+        run: pnpm test
+
+      - name: Run TypeScript Checks
+        run: pnpm check-types
+
+  deploy:
+    name: Deploy to EC2 via SSH
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy Docker Compose Services
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            set -e
+
+            # Navigate to project directory (adjust path if cloned elsewhere)
+            cd ~/Collab/monorepo || cd ~/monorepo
+
+            # Pull latest code from main
+            git fetch origin main
+            git reset --hard origin/main
+
+            # Write production .env file from GitHub Secrets
+            cat << 'EOF' > .env
+            NODE_ENV=production
+            API_DOMAIN=${{ secrets.API_DOMAIN }}
+            ACME_EMAIL=${{ secrets.ACME_EMAIL }}
+
+            # Serverless Databases
+            REDIS_URL=${{ secrets.REDIS_URL }}
+            DATABASE_URL=${{ secrets.DATABASE_URL }}
+
+            # Vercel Frontend Allowed Origin
+            WEB_APP_URL=${{ secrets.WEB_APP_URL }}
+
+            # Application Secrets
+            JWT_SECRET=${{ secrets.JWT_SECRET }}
+            GATEWAY_INTERNAL_SECRET=${{ secrets.GATEWAY_INTERNAL_SECRET }}
+            ACCESS_TOKEN_COOKIE_NAME=${{ secrets.ACCESS_TOKEN_COOKIE_NAME }}
+
+            # Pramaan OAuth Credentials
+            PRAMAAN_CLIENT_ID=${{ secrets.PRAMAAN_CLIENT_ID }}
+            PRAMAAN_SECRET=${{ secrets.PRAMAAN_SECRET }}
+            PRAMAAN_SERVER_URL=${{ secrets.PRAMAAN_SERVER_URL }}
+            CALLBACK_URL=${{ secrets.CALLBACK_URL }}
+            EOF
+
+            # Build and start all 4 microservices + Caddy in detached mode
+            docker compose up -d --build --remove-orphans
+
+            # Clean up old dangling images to save free tier disk space
+            docker image prune -f
