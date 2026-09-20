@@ -5,6 +5,8 @@ node_modules
 .next
 dist
 generated
+apps/web/.next
+apps/web/public
 *.log
 .env.local
 .env.*.local
