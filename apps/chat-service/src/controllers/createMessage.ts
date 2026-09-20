@@ -1,12 +1,10 @@
 import type { Request, Response } from 'express';
-import type { ChatMessagePayloadAndReceivers, CreateMessageInput } from '@repo/validation';
+import type { CreateMessageInput } from '@repo/validation';
 import { v4 as uuidv4 } from 'uuid';
 import { prisma, MessageType } from '@repo/db';
 import { getRoomMemberIds, toChatMessageRecord } from './@helpers.js';
 import { logger } from '../lib/logger.js';
 import { redis } from '../lib/redis.js';
-
-const REDIS_CHANNEL = 'chat-messages';
 
 export const createMessage = async (req: Request, res: Response) => {
   const { text, attachments, roomId, parentId, type } = req.body as CreateMessageInput['body'];
@@ -50,20 +48,22 @@ export const createMessage = async (req: Request, res: Response) => {
     const messageRecord = toChatMessageRecord(created);
 
     try {
-      if (receivers.length > 0) {
-        const wsPayload: ChatMessagePayloadAndReceivers = {
-          id: messageRecord.id,
-          sender: messageRecord.userId,
-          text: messageRecord.text,
-          attachments: messageRecord.attachments,
-          roomId: messageRecord.roomId,
-          parentId: messageRecord.parentId,
-          createdAt: messageRecord.createdAt,
-          receivers,
-        };
-
-        await redis.publish(REDIS_CHANNEL, JSON.stringify(wsPayload));
-      }
+      const roomChannel = `room:${messageRecord.roomId}`;
+      await redis.publish(
+        roomChannel,
+        JSON.stringify({
+          type: 'chat_message',
+          payload: {
+            id: messageRecord.id,
+            sender: messageRecord.userId,
+            text: messageRecord.text,
+            attachments: messageRecord.attachments,
+            roomId: messageRecord.roomId,
+            parentId: messageRecord.parentId,
+            createdAt: messageRecord.createdAt,
+          },
+        }),
+      );
     } catch (publishError) {
       logger.error({ publishError, messageId: messageRecord.id }, 'Message created but live publish failed');
     }

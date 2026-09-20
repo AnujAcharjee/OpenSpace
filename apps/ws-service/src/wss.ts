@@ -2,6 +2,7 @@ import { WebSocketServer } from 'ws';
 import { logger } from './logger.js';
 import type { AppWebSocket, SessionUser, AuthedRequest } from './types/wss.js';
 import { redis } from './redis.js';
+import { subscriptionManager } from './subscriptionManager.js';
 
 const PORT = Number(process.env.PORT) || 3002;
 const HEARTBEAT_INTERVAL = 30_000;
@@ -180,13 +181,20 @@ export async function startWebSocketServer(): Promise<WebSocketServer> {
           JSON.stringify({ sid: ws.sessionId, uid: ws.user.id, srv: process.env.INSTANCE_NAME }),
         );
 
+        await subscriptionManager.registerClient(ws);
+
         logger.info({ username: ws.user.username, sessionId: ws.sessionId }, 'WebSocket client connected');
 
-        ws.on('message', (data: Buffer) => {
+        ws.on('message', async (data: Buffer) => {
           try {
-            const raw = data.toString();
+            const raw = JSON.parse(data.toString());
             logger.debug({ data: raw }, 'Received message from client');
-            // TODO: parse with wsMessageSchema and dispatch
+
+            if (raw.type === 'join_room' && typeof raw.roomId === 'string') {
+              await subscriptionManager.joinRoom(ws, raw.roomId);
+            } else if (raw.type === 'leave_room' && typeof raw.roomId === 'string') {
+              await subscriptionManager.leaveRoom(ws, raw.roomId);
+            }
           } catch (err) {
             logger.error({ err }, 'ws.on message handler error');
           }
@@ -194,6 +202,8 @@ export async function startWebSocketServer(): Promise<WebSocketServer> {
 
         ws.on('close', async (code: number, reason: Buffer) => {
           try {
+            await subscriptionManager.unregisterClient(ws);
+
             // del user session from ws map
             await redis.del(userToWssMapKey(ws.user.id));
 

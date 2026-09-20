@@ -323,6 +323,9 @@ importers:
 
   apps/ws-service:
     dependencies:
+      '@repo/db':
+        specifier: workspace:*
+        version: link:../../packages/db
       '@repo/logger':
         specifier: workspace:*
         version: link:../../packages/logger

@@ -592,7 +592,7 @@ function DialogEditRoom({ room }: { room: RoomRecord }) {
               className="w-full"
               onClick={handleOpenDeleteConfirmation}
             >
-              Delete group
+              Delete room
             </Button>
           </div>
         </DialogContent>

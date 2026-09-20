@@ -7,8 +7,6 @@ import { redis } from '../../lib/redis.js';
 import { toRoomRecord } from '../@helpers.js';
 import { AppError } from '../../utils/appError.js';
 
-const REDIS_CHANNEL = 'chat-messages';
-
 export const removeRoomMember = async (req: Request, res: Response) => {
   const { id: roomId, memberId } = req.params as RemoveRoomMemberInput['params'];
 
@@ -61,30 +59,33 @@ export const removeRoomMember = async (req: Request, res: Response) => {
     const removedUsername = removedMember.user?.username ?? 'A user';
 
     try {
-      const remainingReceivers = room.members.map((member) => member.userId);
-      if (remainingReceivers.length > 0) {
-        await redis.publish(
-          REDIS_CHANNEL,
-          JSON.stringify({
+      // 1. Notify remaining room members via room-scoped channel
+      await redis.publish(
+        `room:${roomId}`,
+        JSON.stringify({
+          type: 'chat_message',
+          payload: {
             id: uuidv4(),
             sender: removedMember.userId,
-            text: `${removedUsername} was removed from the group`,
+            text: `${removedUsername} was removed from the room`,
             roomId,
             createdAt: new Date().toISOString(),
-            receivers: remainingReceivers,
-          }),
-        );
-      }
+          },
+        }),
+      );
 
-      await redis.publish(
-        REDIS_CHANNEL,
-        JSON.stringify({
+      // 2. Notify the removed user specifically via their user-scoped channel
+      const removalPayload = {
+        type: 'room_member_removed',
+        payload: {
           roomId,
           removedUserId: removedMember.userId,
           removedUsername,
-          receivers: [removedMember.userId],
-        }),
-      );
+        },
+      };
+
+      await redis.publish(`user:${removedMember.userId}`, JSON.stringify(removalPayload));
+      await redis.publish(`room:${roomId}`, JSON.stringify(removalPayload));
     } catch (publishError) {
       logger.error({ publishError, roomId, memberId }, 'Room member removed but WS publish failed');
     }

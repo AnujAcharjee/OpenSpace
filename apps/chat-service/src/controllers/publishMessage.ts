@@ -4,7 +4,6 @@ import { getRoomMemberIds } from './@helpers.js';
 import { logger } from '../lib/logger.js';
 import { redis } from '../lib/redis.js';
 
-const REDIS_CHANNEL = 'chat-messages';
 const CHAT_STREAM = 'stream:chat-messages';
 
 type PublishMessageBody = {
@@ -18,10 +17,6 @@ type PublishMessageBody = {
 type PublishMessagePayload = PublishMessageBody & {
   id: string;
   createdAt: string;
-};
-
-type PublishMessagePayloadAndReceivers = PublishMessagePayload & {
-  receivers: string[];
 };
 
 export const publishMessage = async (req: Request, res: Response) => {
@@ -46,18 +41,18 @@ export const publishMessage = async (req: Request, res: Response) => {
 
     logger.debug(receivers, 'Message Receivers');
 
+    const roomChannel = `room:${chatMessagePayload.roomId}`;
+
     const pipeline = redis
       .pipeline()
-      .xadd(CHAT_STREAM, 'MAXLEN', '~', 100000, '*', 'data', JSON.stringify(chatMessagePayload));
-
-    if (receivers.length > 0) {
-      const chatMessageAndReceiversPayload: PublishMessagePayloadAndReceivers = {
-        ...chatMessagePayload,
-        receivers,
-      };
-
-      pipeline.publish(REDIS_CHANNEL, JSON.stringify(chatMessageAndReceiversPayload));
-    }
+      .xadd(CHAT_STREAM, 'MAXLEN', '~', 100000, '*', 'data', JSON.stringify(chatMessagePayload))
+      .publish(
+        roomChannel,
+        JSON.stringify({
+          type: 'chat_message',
+          payload: chatMessagePayload,
+        }),
+      );
 
     const pipelineResults = await pipeline.exec();
 
@@ -71,7 +66,7 @@ export const publishMessage = async (req: Request, res: Response) => {
       throw pipelineError[0];
     }
 
-    logger.info({ message }, `Message published to Redis channel ${REDIS_CHANNEL}`);
+    logger.info({ message }, `Message published to Redis room channel ${roomChannel}`);
 
     return res.status(200).json({
       success: true,

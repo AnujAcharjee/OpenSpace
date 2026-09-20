@@ -12,6 +12,7 @@
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
+    "@repo/db": "workspace:*",
     "@repo/logger": "workspace:*",
     "@repo/redis": "workspace:*",
     "@repo/validation": "workspace:*",
