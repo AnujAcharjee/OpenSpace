@@ -15,9 +15,9 @@ const CLIENT_ID =
     throw new Error('PRAMAAN_CLIENT_ID is not set');
   })();
 const CLIENT_SECRET =
-  process.env.PRAMAAN_SECRET ??
+  process.env.PRAMAAN_CLIENT_SECRET ??
   (() => {
-    throw new Error('PRAMAAN_SECRET is not set');
+    throw new Error('PRAMAAN_CLIENT_SECRET is not set');
   })();
 const CALLBACK_URL =
   process.env.CALLBACK_URL ?? `${API_GATEWAY_URL}/api/v1/auth/pramaan/callback`;

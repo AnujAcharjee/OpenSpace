@@ -1,0 +1,25 @@
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: collab_redis
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - collab_redis_data:/data
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: collab_postgres
+    env_file:
+      - .env.development.local
+    ports:
+      - "5432:5432"
+    volumes:
+      - collab_postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  collab_redis_data:
+  collab_postgres_data:

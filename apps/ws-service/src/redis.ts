@@ -1,3 +1,9 @@
+import dotenv from 'dotenv';
+import path from 'path';
+
+dotenv.config();
+dotenv.config({ path: path.resolve(process.cwd(), '../../.env') });
+
 import { createRedisClient, type RedisClient, type RedisEventHandlers } from '@repo/redis';
 import { logger } from './logger.js';
 import { WebSocketServer } from 'ws';
@@ -10,7 +16,7 @@ import {
 } from '@repo/validation';
 import { AppWebSocket } from './types/wss.js';
 
-const url = process.env.REDIS_URL!;
+const url = process.env.REDIS_URL || 'redis://localhost:6379';
 
 // const config: RedisConfig = {
 //   host: process.env.REDIS_HOST || 'localhost',
