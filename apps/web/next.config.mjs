@@ -1,4 +1,6 @@
 /** @type {import('next').NextConfig} */
-const nextConfig = {}
+const nextConfig = {
+  transpilePackages: ["@repo/validation", "@repo/auth"],
+}
 
 export default nextConfig
