@@ -43,6 +43,7 @@ import {
 } from "@/components/ui/context-menu"
 import { toast } from "sonner"
 import AppForm, { type FieldConfig } from "@/components/AppForm"
+import { AppIcon } from "@/components/AppIcon"
 import { Button } from "@/components/ui/button"
 import { createRoomSchema } from "@repo/validation"
 import type {
@@ -115,9 +116,21 @@ export default function ChatSection({ room }: { room: RoomRecord | null }) {
   if (!room) {
     return (
       <div className="h-full w-full p-1.5">
-        <Card className="flex h-full w-full items-center justify-center border border-dashed border-border/60 bg-card/40 backdrop-blur-md rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.03)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.15)]">
-          <div className="px-6 text-center text-sm text-muted-foreground font-medium">
-            Select a room to start collaborating.
+        <Card className="flex h-full w-full flex-col items-center justify-center border border-border/40 bg-card/40 backdrop-blur-md rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.03)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.15)] p-6 text-center">
+          <div className="flex flex-col items-center max-w-sm space-y-4">
+            <div className="relative flex items-center justify-center py-2">
+              <div className="pointer-events-none absolute -inset-6 rounded-full bg-[radial-gradient(circle,rgba(244,208,63,0.10)_0%,rgba(212,175,55,0.03)_55%,transparent_70%)] blur-xl" />
+              <AppIcon size="lg" />
+            </div>
+
+            <div className="space-y-1">
+              <h2 className="text-lg font-bold tracking-tight text-foreground">
+                Welcome to Collab
+              </h2>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Select a channel from the sidebar or search to start collaborating.
+              </p>
+            </div>
           </div>
         </Card>
       </div>
@@ -402,7 +415,7 @@ function MessageBubble({
                   </div>
                 </div>
               )}
-              <div className="break-words whitespace-pre-wrap">
+              <div className="break-words whitespace-pre-wrap font-bold">
                 {fallbackMessage}
               </div>
             </div>

@@ -35,12 +35,7 @@ import {
   IconDotsVertical,
   IconLock,
   IconLockOpen2,
-  IconSettings,
-  IconCamera,
 } from "@tabler/icons-react"
-import { optimizeImage } from "@/utils/image"
-import { uploadToCloudinary } from "@/utils/cloudinary"
-
 import {
   Tooltip,
   TooltipContent,
@@ -48,16 +43,14 @@ import {
 } from "@/components/ui/tooltip"
 import { z } from "zod"
 import { useShallow } from "zustand/react/shallow"
-import { useTheme } from "next-themes"
-
-import { type CreateRoomInput, createRoomSchema, editUserBodySchema } from "@repo/validation"
+import { type CreateRoomInput, createRoomSchema } from "@repo/validation"
 import type { RoomRecord } from "@repo/validation"
 import useAppStore from "@/stores/app-store"
 import axios from "axios"
 import { useRooms } from "@/hooks/useRooms"
 import { ThemeToggleButton } from "@/components/theme-toggle"
-import { AppIcon } from '@/components/AppIcon'
-import { usersApiUrl } from "@/constants/apiUrls"
+import { AppIcon } from "@/components/AppIcon"
+import { DialogSettings } from "@/components/DialogSettings"
 
 type CreateRoomFormInput = Omit<CreateRoomInput, "creatorId" | "isPrivate"> & {
   isPrivate: "true" | "false"
@@ -188,8 +181,8 @@ export default function RoomsSection() {
   return (
     <div className="h-full w-full p-1.5">
       <Card className="flex h-full w-full flex-col border border-border/40 bg-card/50 shadow-[0_8px_30px_rgb(0,0,0,0.03)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] backdrop-blur-md rounded-2xl p-0 overflow-hidden">
-        <CardHeader className="shadow-b flex flex-col gap-3 px-4 py-3 shadow-black/5 dark:shadow-white/10">
-          <CardTitle className="flex items-center justify-between">
+        <CardHeader className="flex flex-col gap-3 border-b border-border/50 px-4 py-3 bg-card/40 backdrop-blur-sm w-full">
+          <CardTitle className="flex w-full items-center justify-between gap-4">
             <AppIcon />
             <DialogSettings />
           </CardTitle>
@@ -223,7 +216,7 @@ export default function RoomsSection() {
               <button
                 type="submit"
                 disabled={isSearching || !searchName.trim()}
-                className="rounded-md bg-primary px-2 py-0.5 text-xs font-medium text-primary-foreground disabled:opacity-50"
+                className="relative cursor-pointer rounded-md bg-primary px-2.5 py-0.5 text-xs font-semibold text-primary-foreground shadow-[0_0_10px_rgba(244,187,68,0.35)] transition-all duration-200 hover:shadow-[0_0_14px_rgba(244,187,68,0.6)] hover:brightness-105 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none dark:shadow-[0_0_12px_rgba(244,187,68,0.4)] dark:hover:shadow-[0_0_16px_rgba(244,187,68,0.7)]"
               >
                 {isSearching ? "..." : "Go"}
               </button>
@@ -235,7 +228,7 @@ export default function RoomsSection() {
 
         <CardContent className="min-h-0 flex-1 p-0">
           <ScrollArea className="h-full">
-            <div className="px-3 py-2 sm:px-4">
+            <div className="space-y-1 px-3 py-2 sm:px-4">
               {isSearchMode && (
                 <div className="pb-2 text-xs text-muted-foreground">
                   Search results for &quot;{searchName.trim()}&quot;
@@ -260,19 +253,17 @@ export default function RoomsSection() {
 
               {!isSearching &&
                 displayedRooms.map((room) => (
-                  <Fragment key={room.id}>
-                    <ListItems
-                      room={room}
-                      isActive={activeRoom === room.id}
-                      onSelect={handleRoomSelect}
-                      currentUserId={user.id}
-                      isSearchMode={isSearchMode}
-                      onJoinRoom={handleJoinRoom}
-                      isJoining={joiningRoomId === room.id}
-                      hasPendingRequest={Boolean(pendingJoinRoomIds[room.id])}
-                    />
-                    <Separator className="my-1.5" />
-                  </Fragment>
+                  <ListItems
+                    key={room.id}
+                    room={room}
+                    isActive={activeRoom === room.id}
+                    onSelect={handleRoomSelect}
+                    currentUserId={user.id}
+                    isSearchMode={isSearchMode}
+                    onJoinRoom={handleJoinRoom}
+                    isJoining={joiningRoomId === room.id}
+                    hasPendingRequest={Boolean(pendingJoinRoomIds[room.id])}
+                  />
                 ))}
             </div>
           </ScrollArea>
@@ -340,20 +331,35 @@ function ListItems({
           onSelect(room)
         }
       }}
-      className={`relative flex items-center justify-between rounded-md bg-card px-2.5 py-1.5 transition-colors hover:bg-muted/50`}
+      className={`group relative flex items-center justify-between rounded-xl px-2.5 py-2 transition-all duration-150 cursor-pointer bg-card/40 hover:bg-muted/60 ${
+        isActive
+          ? "border border-[#d4af37]/70 dark:border-[#f5d061]/70 text-foreground"
+          : "border border-transparent text-muted-foreground hover:text-foreground"
+      }`}
     >
-      <div className="flex items-center gap-2">
-        <Avatar className="h-7 w-7 border border-border">
+      <div className="flex items-center gap-2.5 min-w-0">
+        <Avatar className={`h-8 w-8 shrink-0 border transition-all ${isActive ? "border-[#d4af37]/60" : "border-border/60"}`}>
           <AvatarImage
             src={room.creator?.avatarUrl ?? undefined}
             alt={room.name}
           />
-          <AvatarFallback>{room.name[0]}</AvatarFallback>
+          <AvatarFallback className="text-xs font-semibold bg-muted">
+            {room.name[0]?.toUpperCase()}
+          </AvatarFallback>
           {isActive && (
-            <AvatarBadge className="right-0 bottom-0 h-2 w-2 border-[1.5px] border-background bg-green-500" />
+            <AvatarBadge className="right-0 bottom-0 h-2 w-2 border-[1.5px] border-background bg-emerald-500" />
           )}
         </Avatar>
-        <span className="text-[13px]">{room.name}</span>
+        <div className="min-w-0 flex-1">
+          <div className={`truncate text-xs tracking-tight ${isActive ? "font-semibold text-foreground" : "font-medium text-foreground/90"}`}>
+            {room.name}
+          </div>
+          {room.description && (
+            <div className="truncate text-[10px] text-muted-foreground/80">
+              {room.description}
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="flex items-center gap-2">
@@ -559,259 +565,3 @@ function DialogCreateRoom({ creatorId }: { creatorId: string }) {
   )
 }
 
-function DialogSettings() {
-  const { user, setUser } = useAppStore(
-    useShallow((state) => ({
-      user: state.user,
-      setUser: state.setUser,
-    }))
-  )
-  const [open, setOpen] = useState(false)
-  const [activeTab, setActiveTab] = useState<"profile" | "appearance">("profile")
-  const { theme, setTheme } = useTheme()
-
-  // State to manage avatar file selection, preview, and Cloudinary upload status
-  const [selectedFile, setSelectedFile] = useState<File | null>(null)
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
-  const [removePhoto, setRemovePhoto] = useState(false)
-  const [isUploading, setIsUploading] = useState(false)
-
-  const fileInputRef = useRef<HTMLInputElement>(null)
-
-  if (!user) return null
-
-  const userId = user.id
-
-  const defaultProfileValues = {
-    name: user.name || "",
-    username: user.username || "",
-    bio: user.bio || "",
-  }
-
-  const profileFields: FieldConfig<any>[] = [
-    {
-      name: "name",
-      label: "Full Name",
-      placeholder: "e.g. John Doe",
-      autoComplete: "name",
-    },
-    {
-      name: "username",
-      label: "Username",
-      placeholder: "e.g. johndoe",
-      autoComplete: "username",
-    },
-    {
-      name: "bio",
-      label: "Bio",
-      placeholder: "Tell us a bit about yourself",
-      autoComplete: "off",
-    },
-  ]
-
-  async function handleEditProfile(data: any) {
-    try {
-      setIsUploading(true)
-      let finalAvatarUrl: string | null = user?.avatarUrl || null
-
-      if (removePhoto) {
-        finalAvatarUrl = null
-      } else if (selectedFile) {
-        toast.info("Optimizing profile photo...", toastOptions)
-        const optimizedBlob = await optimizeImage(selectedFile)
-
-        toast.info("Uploading photo to Cloudinary...", toastOptions)
-        finalAvatarUrl = await uploadToCloudinary(optimizedBlob)
-      }
-
-      const payload = {
-        name: data.name?.trim() || null,
-        username: data.username.trim(),
-        bio: data.bio?.trim() || null,
-        avatarUrl: finalAvatarUrl,
-      }
-
-      const res = await axios.patch(`${usersApiUrl}/${userId}`, payload, {
-        withCredentials: true,
-      })
-
-      setUser(res.data.data.user)
-      toast.success("Profile updated successfully", toastOptions)
-      setOpen(false)
-      
-      // Reset state on successful edit
-      setSelectedFile(null)
-      setPreviewUrl(null)
-      setRemovePhoto(false)
-    } catch (error: any) {
-      console.error(error)
-      const message = axios.isAxiosError(error)
-        ? (error.response?.data?.error ?? error.response?.data?.message ?? "Failed to update profile")
-        : (error.message || "Failed to update profile")
-      toast.error(message, toastOptions)
-    } finally {
-      setIsUploading(false)
-    }
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <DialogTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label="Settings"
-              className="flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground transition-all hover:bg-muted hover:text-foreground"
-            >
-              <IconSettings size={18} />
-            </Button>
-          </DialogTrigger>
-        </TooltipTrigger>
-        <TooltipContent>
-          <p>Settings</p>
-        </TooltipContent>
-      </Tooltip>
-
-      <DialogContent className="sm:max-w-lg" aria-describedby={undefined}>
-        <DialogHeader>
-          <DialogTitle className="text-2xl font-bold">Settings</DialogTitle>
-        </DialogHeader>
-
-        <div className="flex gap-4 border-b border-border/40 pb-2">
-          <Button
-            type="button"
-            variant="ghost"
-            className={`px-3 py-1 text-sm font-semibold rounded-lg ${
-              activeTab === "profile" ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted/40"
-            }`}
-            onClick={() => setActiveTab("profile")}
-          >
-            Edit Profile
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            className={`px-3 py-1 text-sm font-semibold rounded-lg ${
-              activeTab === "appearance" ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted/40"
-            }`}
-            onClick={() => setActiveTab("appearance")}
-          >
-            Appearance
-          </Button>
-        </div>
-
-        <div className="mt-4 min-h-[300px]">
-          {activeTab === "profile" && (
-            <div className="space-y-6">
-              {/* Instagram/Twitter-style Avatar Upload */}
-              <div className="flex flex-col items-center gap-3">
-                <div 
-                  onClick={() => fileInputRef.current?.click()}
-                  className="group relative size-24 cursor-pointer overflow-hidden rounded-full border-2 border-border/40 bg-muted shadow-md transition-all hover:border-primary hover:shadow-lg animate-fade-in"
-                >
-                  {/* Image Display */}
-                  <img
-                    src={
-                      removePhoto
-                        ? `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(user.name || user.username)}`
-                        : previewUrl || user.avatarUrl || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(user.name || user.username)}`
-                    }
-                    alt="Profile preview"
-                    className="h-full w-full object-cover"
-                  />
-                  
-                  {/* Hover Overlay */}
-                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
-                    <IconCamera className="size-6 text-white" />
-                    <span className="mt-1 text-[10px] font-semibold text-white">Upload</span>
-                  </div>
-                </div>
-
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="text-xs font-semibold rounded-lg cursor-pointer"
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    Change photo
-                  </Button>
-                  
-                  {(!removePhoto && (previewUrl || user.avatarUrl)) && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="text-xs font-semibold rounded-lg text-destructive hover:bg-destructive/10 cursor-pointer"
-                      onClick={() => {
-                        setSelectedFile(null)
-                        setPreviewUrl(null)
-                        setRemovePhoto(true)
-                      }}
-                    >
-                      Remove photo
-                    </Button>
-                  )}
-                </div>
-
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/png, image/jpeg, image/webp"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0]
-                    if (file) {
-                      setSelectedFile(file)
-                      const objectUrl = URL.createObjectURL(file)
-                      setPreviewUrl(objectUrl)
-                      setRemovePhoto(false)
-                    }
-                  }}
-                />
-              </div>
-
-              {/* Edit Profile Text Form */}
-              <AppForm
-                formId="edit-profile-form"
-                schema={editUserBodySchema}
-                defaultValues={defaultProfileValues}
-                fields={profileFields}
-                onSubmit={handleEditProfile}
-                submitLabel={isUploading ? "Uploading & saving..." : "Save changes"}
-                pendingLabel="Saving changes..."
-              />
-            </div>
-          )}
-
-          {activeTab === "appearance" && (
-            <div className="space-y-6">
-              <div className="flex flex-col gap-2">
-                <span className="text-sm font-semibold text-foreground">Select Theme</span>
-                <span className="text-xs text-muted-foreground">
-                  Customize Collab's aesthetic to your taste.
-                </span>
-                <div className="flex gap-2 mt-2">
-                  {(["light", "dark", "system"] as const).map((t) => (
-                    <Button
-                      key={t}
-                      type="button"
-                      variant={theme === t ? "default" : "outline"}
-                      className="px-4 py-2 capitalize font-semibold rounded-xl"
-                      onClick={() => setTheme(t)}
-                    >
-                      {t}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
-  )
-}
