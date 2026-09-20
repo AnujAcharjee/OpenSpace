@@ -76,11 +76,11 @@ jobs:
             # Application Secrets
             JWT_SECRET=${{ secrets.JWT_SECRET }}
             GATEWAY_INTERNAL_SECRET=${{ secrets.GATEWAY_INTERNAL_SECRET }}
-            ACCESS_TOKEN_COOKIE_NAME=${{ secrets.ACCESS_TOKEN_COOKIE_NAME }}
+            ACCESS_TOKEN_COOKIE_NAME=${{ secrets.ACCESS_TOKEN_COOKIE_NAME || 'accessToken' }}
 
             # Pramaan OAuth Credentials
             PRAMAAN_CLIENT_ID=${{ secrets.PRAMAAN_CLIENT_ID }}
-            PRAMAAN_SECRET=${{ secrets.PRAMAAN_SECRET }}
+            PRAMAAN_SECRET=${{ secrets.PRAMAAN_CLIENT_SECRET || secrets.PRAMAAN_SECRET }}
             PRAMAAN_SERVER_URL=${{ secrets.PRAMAAN_SERVER_URL }}
             CALLBACK_URL=${{ secrets.CALLBACK_URL }}
             EOF
