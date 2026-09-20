@@ -14,6 +14,8 @@ import { loggingMiddleware } from './middleware/loggingMiddleware.js';
 import { attachUserContext } from './middleware/attachUserContext.js';
 import { requireGatewaySecret } from './middleware/requireGatewaySecret.js';
 
+import { streamWorker } from './lib/streamWorker.js';
+
 const PORT = process.env.PORT ?? 3001;
 
 const app = express();
@@ -34,6 +36,11 @@ app.use('/api/v1/chat', requireGatewaySecret, attachUserContext, chatRouter);
 
 app.use(errorHandler);
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   logger.info(`Chat service running on port ${PORT}`);
+  try {
+    await streamWorker.start();
+  } catch (err) {
+    logger.error({ err }, 'Failed to start stream worker');
+  }
 });
