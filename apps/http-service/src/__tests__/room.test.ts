@@ -28,6 +28,12 @@ const { mockRedis, mockPrisma } = vi.hoisted(() => ({
       create: vi.fn(),
       upsert: vi.fn(),
     },
+    chatMessage: {
+      create: vi.fn(),
+      findMany: vi.fn(),
+      findUnique: vi.fn(),
+      update: vi.fn(),
+    },
     user: {
       findUnique: vi.fn(),
     },
@@ -62,6 +68,11 @@ vi.mock('@repo/db', () => ({
     PENDING: 'PENDING',
     ACCEPTED: 'ACCEPTED',
     REJECTED: 'REJECTED',
+  },
+  MessageType: {
+    TEXT: 'TEXT',
+    SYSTEM: 'SYSTEM',
+    MEDIA: 'MEDIA',
   },
 }));
 
