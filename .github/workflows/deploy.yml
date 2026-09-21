@@ -86,7 +86,7 @@ jobs:
             cat << 'EOF' > .env
             NODE_ENV=production
             API_DOMAIN=${{ secrets.API_DOMAIN || 'api.collab.anujacharjee.com' }}
-            ACME_EMAIL=${{ secrets.ACME_EMAIL || 'anujacharjee37@gmail.com' }}
+            ACME_EMAIL=${{ secrets.ACME_EMAIL || 'anujacharjee36@gmail.com' }}
 
             # Serverless Databases (Sensitive)
             REDIS_URL=${{ secrets.REDIS_URL }}
