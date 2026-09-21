@@ -278,8 +278,9 @@ export const oauthCallBack = async (req: Request, res: Response) => {
       getAuthCookieOptions(ACCESS_TOKEN_TTL_SECONDS),
     );
 
-    logger.info({ userId: user.id }, 'User successfully authenticated via Pramaan SDK');
-    return res.redirect(`${WEB_APP_URL}`);
+    logger.info({ userId: user.id, username: user.username }, 'User successfully authenticated via Pramaan SDK');
+    const redirectUrl = new URL(`/@${encodeURIComponent(user.username)}`, WEB_APP_URL).toString();
+    return res.redirect(redirectUrl);
   } catch (error) {
     logger.error({ err: error, state }, 'Pramaan SDK callback processing failed');
     return res.redirect(buildWebAuthUrl(mode, 'Authentication failed. Please try again.'));

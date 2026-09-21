@@ -22,6 +22,16 @@ interface StreamMessageData {
   type?: keyof typeof MessageType;
 }
 
+function safeParseAttachments(attachments?: string | null): any {
+  if (!attachments) return null;
+  if (typeof attachments !== 'string') return attachments;
+  try {
+    return JSON.parse(attachments);
+  } catch {
+    return null;
+  }
+}
+
 export class StreamWorker {
   private isRunning = false;
   private reclaimTimer: NodeJS.Timeout | null = null;
@@ -187,7 +197,7 @@ export class StreamWorker {
         userId: data.sender,
         roomId: data.roomId,
         text: data.text ?? '',
-        attachments: data.attachments ? JSON.parse(data.attachments) : null,
+        attachments: safeParseAttachments(data.attachments),
         parentId: data.parentId ?? null,
         type: data.type ? MessageType[data.type] : MessageType.TEXT,
         createdAt: data.createdAt ? new Date(data.createdAt) : new Date(),
@@ -222,7 +232,7 @@ export class StreamWorker {
               userId: data.sender,
               roomId: data.roomId,
               text: data.text ?? '',
-              attachments: data.attachments ? JSON.parse(data.attachments) : null,
+              attachments: safeParseAttachments(data.attachments),
               parentId: data.parentId ?? null,
               type: data.type ? MessageType[data.type] : MessageType.TEXT,
               createdAt: data.createdAt ? new Date(data.createdAt) : new Date(),

@@ -19,8 +19,12 @@ async function validateTicket(ticket: string): Promise<SessionUser | null> {
   const data = await redis.getdel(ticketKey);
   if (!data) return null;
 
-  const user: SessionUser = JSON.parse(data);
-  return user;
+  try {
+    const user: SessionUser = JSON.parse(data);
+    return user;
+  } catch {
+    return null;
+  }
 }
 
 function clearHeartbeat() {
