@@ -32,8 +32,9 @@ model ChatMessage {
 
 model ChatRoom {
   id           String                @id
-  name         String                @db.VarChar(100)
+  name         String                @unique @db.VarChar(100)
   description  String?               @db.VarChar(255)
+  avatarUrl    String?
   isPrivate    Boolean               @default(false)
   creatorId    String?
   createdAt    DateTime              @default(now())
@@ -42,6 +43,8 @@ model ChatRoom {
   creator      User?                 @relation(fields: [creatorId], references: [id])
   members      ChatRoomMember[]
   joinRequests ChatRoomJoinRequest[]
+
+  @@index([name])
 }
 
 model ChatRoomMember {

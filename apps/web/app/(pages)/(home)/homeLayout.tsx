@@ -40,16 +40,27 @@ export default function HomeLayout() {
       <ResizablePanelGroup className="h-full w-full">
         {showSidebar && (
           <>
-            <ResizablePanel defaultSize={30} minSize={20}>
+            <ResizablePanel
+              defaultSize={isLg ? 25 : 100}
+              minSize={isLg ? 16 : 100}
+            >
               <div className="h-full overflow-hidden">
                 <RoomsSection />
               </div>
             </ResizablePanel>
-            {isLg && showChat && <ResizableHandle withHandle />}
+            {isLg && showChat && (
+              <ResizableHandle
+                withHandle
+                className="w-2 bg-transparent hover:bg-primary/20 transition-colors mx-0.5 rounded-full cursor-col-resize"
+              />
+            )}
           </>
         )}
         {showChat && (
-          <ResizablePanel defaultSize={isLg ? 70 : 100} minSize={40}>
+          <ResizablePanel
+            defaultSize={isLg ? 75 : 100}
+            minSize={isLg ? 25 : 100}
+          >
             <div className="h-full overflow-hidden">
               <ChatSection room={activeRoom} />
             </div>

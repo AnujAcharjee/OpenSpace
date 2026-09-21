@@ -2,8 +2,13 @@ import { WebSocket } from 'ws';
 import { prisma } from '@repo/db';
 import {
   chatMessagePayloadSchema,
+  messageDeletedPayloadSchema,
   roomMemberRemovedPayloadSchema,
   notificationPayloadSchema,
+  roomJoinedPayloadSchema,
+  roomUpdatedPayloadSchema,
+  roomDeletedPayloadSchema,
+  roomJoinRequestedPayloadSchema,
   type WsMessage,
 } from '@repo/validation';
 import { redisSub } from './redis.js';
@@ -64,11 +69,43 @@ export class SubscriptionManager {
             payload: payload.data,
           };
         }
+      } else if (raw.type === 'message_deleted') {
+        const payload = messageDeletedPayloadSchema.safeParse(raw.payload ?? raw);
+        if (payload.success) {
+          wsMessage = {
+            type: 'message_deleted',
+            payload: payload.data,
+          };
+        }
       } else if (raw.type === 'room_member_removed' || (!raw.type && raw.removedUserId)) {
         const payload = roomMemberRemovedPayloadSchema.safeParse(raw.payload ?? raw);
         if (payload.success) {
           wsMessage = {
             type: 'room_member_removed',
+            payload: payload.data,
+          };
+        }
+      } else if (raw.type === 'room_updated') {
+        const payload = roomUpdatedPayloadSchema.safeParse(raw.payload ?? raw);
+        if (payload.success) {
+          wsMessage = {
+            type: 'room_updated',
+            payload: payload.data,
+          };
+        }
+      } else if (raw.type === 'room_deleted') {
+        const payload = roomDeletedPayloadSchema.safeParse(raw.payload ?? raw);
+        if (payload.success) {
+          wsMessage = {
+            type: 'room_deleted',
+            payload: payload.data,
+          };
+        }
+      } else if (raw.type === 'room_join_requested') {
+        const payload = roomJoinRequestedPayloadSchema.safeParse(raw.payload ?? raw);
+        if (payload.success) {
+          wsMessage = {
+            type: 'room_join_requested',
             payload: payload.data,
           };
         }
@@ -119,6 +156,34 @@ export class SubscriptionManager {
         if (payload.success) {
           wsMessage = {
             type: 'notification',
+            payload: payload.data,
+          };
+        }
+      } else if (raw.type === 'room_joined') {
+        const payload = roomJoinedPayloadSchema.safeParse(raw.payload ?? raw);
+        if (payload.success) {
+          wsMessage = {
+            type: 'room_joined',
+            payload: payload.data,
+          };
+          // Auto-join this socket to the room channel
+          for (const client of sockets) {
+            void this.joinRoom(client, payload.data.room.id);
+          }
+        }
+      } else if (raw.type === 'room_deleted') {
+        const payload = roomDeletedPayloadSchema.safeParse(raw.payload ?? raw);
+        if (payload.success) {
+          wsMessage = {
+            type: 'room_deleted',
+            payload: payload.data,
+          };
+        }
+      } else if (raw.type === 'room_join_requested') {
+        const payload = roomJoinRequestedPayloadSchema.safeParse(raw.payload ?? raw);
+        if (payload.success) {
+          wsMessage = {
+            type: 'room_join_requested',
             payload: payload.data,
           };
         }

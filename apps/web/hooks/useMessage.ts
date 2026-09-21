@@ -14,6 +14,12 @@ export type ChatHistoryMessage = {
   text?: string
   attachments?: string
   parentId?: string
+  parent?: {
+    id: string
+    text?: string
+    senderUsername?: string
+    isDeleted?: boolean
+  }
   isDeleted: boolean
   modifiedAt?: string
   createdAt: string

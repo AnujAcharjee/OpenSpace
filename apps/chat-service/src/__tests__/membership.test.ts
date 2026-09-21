@@ -21,6 +21,9 @@ const { mockRedis, mockPrisma } = vi.hoisted(() => ({
     chatRoomMember: {
       findUnique: vi.fn(),
     },
+    chatRoom: {
+      findUnique: vi.fn(),
+    },
     chatMessage: {
       findMany: vi.fn(),
     },

@@ -28,6 +28,18 @@ export const createMessage = async (req: Request, res: Response) => {
     }
 
     const messageId = uuidv4();
+    let validParentId: string | null = null;
+
+    if (parentId && typeof parentId === 'string') {
+      const parentMessage = await prisma.chatMessage.findUnique({
+        where: { id: parentId },
+        select: { id: true, roomId: true },
+      });
+      if (parentMessage && parentMessage.roomId === roomId) {
+        validParentId = parentMessage.id;
+      }
+    }
+
     const created = await prisma.chatMessage.create({
       data: {
         id: messageId,
@@ -35,12 +47,17 @@ export const createMessage = async (req: Request, res: Response) => {
         roomId,
         text: text ?? '',
         attachments: attachments ? JSON.parse(attachments) : null,
-        parentId: parentId ?? null,
+        parentId: validParentId,
         type: (type as keyof typeof MessageType) ?? MessageType.TEXT,
         updatedAt: new Date(),
       },
       include: {
         user: true,
+        parent: {
+          include: {
+            user: true,
+          },
+        },
       },
     });
 
@@ -59,7 +76,11 @@ export const createMessage = async (req: Request, res: Response) => {
             attachments: messageRecord.attachments,
             roomId: messageRecord.roomId,
             parentId: messageRecord.parentId,
+            parent: messageRecord.parent,
             createdAt: messageRecord.createdAt,
+            senderUsername: messageRecord.senderUsername,
+            senderAvatarUrl: messageRecord.senderAvatarUrl,
+            type: messageRecord.type,
           },
         }),
       );

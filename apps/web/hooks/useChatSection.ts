@@ -16,6 +16,7 @@ import axios from "axios"
 import { wsClient } from "@/ws"
 
 const EMPTY_ROOM_MESSAGES: RoomMessage[] = []
+const EMPTY_JOIN_REQUESTS: RoomJoinRequestRecord[] = []
 const toastOptions = { position: "top-center" as const }
 
 // ─── Mappers ────────────────────────────────────────────────────────────────
@@ -23,11 +24,13 @@ const toastOptions = { position: "top-center" as const }
 export function toRoomMessage(message: ChatHistoryMessage): RoomMessage {
   return {
     id: message.id,
+    type: (message.type as RoomMessage["type"]) ?? "TEXT",
     sender: message.userId,
     roomId: message.roomId,
     text: message.text,
     attachments: message.attachments,
     parentId: message.parentId,
+    parent: message.parent,
     createdAt: message.createdAt,
     senderUsername: message.senderUsername,
     senderAvatarUrl: message.senderAvatarUrl,
@@ -38,11 +41,13 @@ export function toRoomMessage(message: ChatHistoryMessage): RoomMessage {
 export function toRoomPreviewMessage(message: ChatHistoryMessage): RoomMessage {
   return {
     id: message.id,
+    type: (message.type as RoomMessage["type"]) ?? "TEXT",
     sender: message.userId,
     roomId: message.roomId,
     text: message.text,
     attachments: message.attachments,
     parentId: message.parentId,
+    parent: message.parent,
     createdAt: message.createdAt,
   }
 }
@@ -85,19 +90,24 @@ function useMessages(room: RoomRecord | null, userId: string | undefined) {
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
-    if (!roomId || !userId) return
+    if (!roomId) return
     wsClient.joinRoom(roomId)
     let isCancelled = false
 
     const load = async () => {
-      setIsLoading(true)
+      const cached = useAppStore.getState().messages[roomId]
+      if (!cached || cached.length === 0) {
+        setIsLoading(true)
+      }
+
       try {
-        const messages = (await fetchMessages(roomId, userId)).map(
+        const messages = (await fetchMessages(roomId, userId ?? "")).map(
           toRoomMessage
         )
         if (!isCancelled) setMessages(roomId, messages)
       } catch (error) {
-        if (!isCancelled) {
+        const hasCached = useAppStore.getState().messages[roomId]?.length
+        if (!isCancelled && !hasCached) {
           const message = axios.isAxiosError(error)
             ? (error.response?.data?.error ??
               error.response?.data?.message ??
@@ -118,7 +128,7 @@ function useMessages(room: RoomRecord | null, userId: string | undefined) {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" })
-  }, [roomId, roomMessages])
+  }, [roomId, roomMessages.length])
 
   return { roomMessages, isLoading, messagesEndRef }
 }
@@ -174,6 +184,10 @@ function useSendMessage(
   async function sendMessage() {
     const text = draft.trim()
     if (!text || isSending || !userId) return
+
+    // Immediately clear draft and reply state for snappy Discord-like UX
+    setDraft("")
+    onSent()
     setIsSending(true)
 
     try {
@@ -186,9 +200,8 @@ function useSendMessage(
       const message = await createMessage(payload)
       addMessage(room.id, toRoomMessage(message))
       updateRoomLastMessage(room.id, toRoomPreviewMessage(message))
-      setDraft("")
-      onSent()
     } catch (error) {
+      setDraft(text) // Restore text on failure
       const message = axios.isAxiosError(error)
         ? (error.response?.data?.error ??
           error.response?.data?.message ??
@@ -211,8 +224,8 @@ function useDeleteMessage(
   replyingTo: RoomMessage | null,
   onClearReply: () => void
 ) {
+  const removeMessage = useAppStore((s) => s.removeMessage)
   const setMessages = useAppStore((s) => s.setMessages)
-  const updateRoomLastMessage = useAppStore((s) => s.updateRoomLastMessage)
   const { deleteMessage, fetchMessages } = useMessage()
   const [deletingMessageId, setDeletingMessageId] = useState<string | null>(
     null
@@ -222,15 +235,20 @@ function useDeleteMessage(
     if (deletingMessageId) return
     setDeletingMessageId(messageId)
 
+    // 1. Instantly remove from local store for immediate 0ms UI feedback
+    removeMessage(roomId, messageId)
+    if (replyingTo?.id === messageId) onClearReply()
+
     try {
       await deleteMessage(messageId)
-      const refreshed = (await fetchMessages(roomId, userId)).map(toRoomMessage)
-      setMessages(roomId, refreshed)
-      const last = refreshed[refreshed.length - 1]
-      if (last) updateRoomLastMessage(roomId, last)
-      if (replyingTo?.id === messageId) onClearReply()
       toast.success("Message deleted", toastOptions)
     } catch (error) {
+      // Re-fetch to restore state if deletion failed on server
+      try {
+        const refreshed = (await fetchMessages(roomId, userId)).map(toRoomMessage)
+        setMessages(roomId, refreshed)
+      } catch {}
+
       const message = axios.isAxiosError(error)
         ? (error.response?.data?.error ??
           error.response?.data?.message ??
@@ -254,15 +272,49 @@ function useMessageMeta(
   avatarUrl: string | null | undefined
 ) {
   function getAuthorName(message: RoomMessage) {
-    return message.sender === userId
-      ? (username ?? "You")
-      : (message.senderUsername ?? room?.creator?.username ?? "Room member")
+    if (message.sender === userId) {
+      return username ?? "You"
+    }
+
+    if (message.senderUsername && message.senderUsername !== "Unknown") {
+      return message.senderUsername
+    }
+
+    const member = room?.members?.find(
+      (m) => m.userId === message.sender || m.user?.id === message.sender
+    )
+    if (member?.user?.username) {
+      return member.user.username
+    }
+
+    if (room?.creatorId === message.sender && room.creator?.username) {
+      return room.creator.username
+    }
+
+    return "Room member"
   }
 
   function getAuthorAvatar(message: RoomMessage) {
-    return message.sender === userId
-      ? (avatarUrl ?? undefined)
-      : (message.senderAvatarUrl ?? room?.creator?.avatarUrl ?? undefined)
+    if (message.sender === userId) {
+      return avatarUrl ?? undefined
+    }
+
+    if (message.senderAvatarUrl) {
+      return message.senderAvatarUrl
+    }
+
+    const member = room?.members?.find(
+      (m) => m.userId === message.sender || m.user?.id === message.sender
+    )
+    if (member?.user?.avatarUrl) {
+      return member.user.avatarUrl
+    }
+
+    if (room?.creatorId === message.sender && room.creator?.avatarUrl) {
+      return room.creator.avatarUrl
+    }
+
+    return undefined
   }
 
   function getMessageBody(
@@ -290,13 +342,16 @@ export function useRoomMembers(
     respondJoinRequest,
   } = useRooms()
 
+  const pendingRequests = useAppStore(
+    (s) => s.joinRequests[room.id] ?? EMPTY_JOIN_REQUESTS
+  )
+  const setStoreJoinRequests = useAppStore((s) => s.setJoinRequests)
+  const removeStoreJoinRequest = useAppStore((s) => s.removeJoinRequest)
+
   const [addMembersOpen, setAddMembersOpen] = useState(false)
   const [removeTarget, setRemoveTarget] = useState<RoomMemberRecord | null>(
     null
   )
-  const [pendingRequests, setPendingRequests] = useState<
-    RoomJoinRequestRecord[]
-  >([])
   const [isLoadingPending, setIsLoadingPending] = useState(false)
   const [processingRequestId, setProcessingRequestId] = useState<string | null>(
     null
@@ -307,7 +362,6 @@ export function useRoomMembers(
 
   useEffect(() => {
     if (!canManageRoom || !currentUserId) {
-      setPendingRequests([])
       return
     }
 
@@ -317,7 +371,7 @@ export function useRoomMembers(
       setIsLoadingPending(true)
       try {
         const requests = await getPendingJoinRequests(room.id, currentUserId)
-        if (!isCancelled) setPendingRequests(requests)
+        if (!isCancelled) setStoreJoinRequests(room.id, requests)
       } catch (error) {
         if (!isCancelled) {
           const message = axios.isAxiosError(error)
@@ -336,7 +390,7 @@ export function useRoomMembers(
     return () => {
       isCancelled = true
     }
-  }, [canManageRoom, currentUserId, getPendingJoinRequests, room.id])
+  }, [canManageRoom, currentUserId, getPendingJoinRequests, room.id, setStoreJoinRequests])
 
   async function handleAddMembers() {
     const usernames = usernamesInput
@@ -405,7 +459,7 @@ export function useRoomMembers(
         approve,
       })
       if (result.room) useAppStore.getState().upsertRoom(result.room)
-      setPendingRequests((curr) => curr.filter((r) => r.id !== requestId))
+      removeStoreJoinRequest(room.id, requestId)
       toast.success(
         approve ? "Join request approved" : "Join request rejected",
         toastOptions

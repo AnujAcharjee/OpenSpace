@@ -5,11 +5,13 @@ import type {
   UserRecord,
   RoomRecord,
   ChatMessagePayload,
+  RoomJoinRequestRecord,
 } from "@repo/validation"
 
 export type RoomMessage = ChatMessagePayload & {
+  type?: string
   senderUsername?: string
-  senderAvatarUrl?: string
+  senderAvatarUrl?: string | null
   isDeleted?: boolean
 }
 
@@ -17,6 +19,7 @@ export type RoomUiOptions = {
   pinned: boolean
   muted: boolean
   unread: boolean
+  unreadCount?: number
 }
 
 /**
@@ -38,6 +41,7 @@ interface RoomsState {
   toggleRoomPinned: (roomId: string) => void
   toggleRoomMuted: (roomId: string) => void
   toggleRoomUnread: (roomId: string) => void
+  incrementRoomUnread: (roomId: string) => void
   clearRoomUnread: (roomId: string) => void
   updateRoomLastMessage: (roomId: string, message: ChatMessagePayload) => void
   updateRoomInfo: (roomId: string, data: Partial<RoomRecord>) => void
@@ -48,7 +52,15 @@ interface MessagesState {
   messages: Record<string, RoomMessage[]>
   addMessage: (roomId: string, msg: RoomMessage) => void
   setMessages: (roomId: string, msgs: RoomMessage[]) => void
+  removeMessage: (roomId: string, messageId: string) => void
   clearMessages: (roomId: string) => void
+}
+
+interface JoinRequestsState {
+  joinRequests: Record<string, RoomJoinRequestRecord[]>
+  setJoinRequests: (roomId: string, requests: RoomJoinRequestRecord[]) => void
+  addJoinRequest: (roomId: string, request: RoomJoinRequestRecord) => void
+  removeJoinRequest: (roomId: string, requestId: string) => void
 }
 
 interface HydrationState {
@@ -64,6 +76,7 @@ interface AppActions {
 type AppState = UserState &
   RoomsState &
   MessagesState &
+  JoinRequestsState &
   HydrationState &
   AppActions
 
@@ -190,13 +203,29 @@ const createRoomsSlice: StateCreator<AppState, [], [], RoomsState> = (set) => ({
       },
     })),
   toggleRoomUnread: (roomId) =>
+    set((state) => {
+      const isUnread = !(state.roomUiOptions[roomId]?.unread ?? false)
+      return {
+        roomUiOptions: {
+          ...state.roomUiOptions,
+          [roomId]: {
+            pinned: state.roomUiOptions[roomId]?.pinned ?? false,
+            muted: state.roomUiOptions[roomId]?.muted ?? false,
+            unread: isUnread,
+            unreadCount: isUnread ? 1 : 0,
+          },
+        },
+      }
+    }),
+  incrementRoomUnread: (roomId) =>
     set((state) => ({
       roomUiOptions: {
         ...state.roomUiOptions,
         [roomId]: {
           pinned: state.roomUiOptions[roomId]?.pinned ?? false,
           muted: state.roomUiOptions[roomId]?.muted ?? false,
-          unread: !(state.roomUiOptions[roomId]?.unread ?? false),
+          unread: true,
+          unreadCount: (state.roomUiOptions[roomId]?.unreadCount ?? 0) + 1,
         },
       },
     })),
@@ -208,6 +237,7 @@ const createRoomsSlice: StateCreator<AppState, [], [], RoomsState> = (set) => ({
           pinned: state.roomUiOptions[roomId]?.pinned ?? false,
           muted: state.roomUiOptions[roomId]?.muted ?? false,
           unread: false,
+          unreadCount: 0,
         },
       },
     })),
@@ -227,7 +257,21 @@ const createRoomsSlice: StateCreator<AppState, [], [], RoomsState> = (set) => ({
     }))
   },
 
-  setActiveRoom: (roomId) => set({ activeRoom: roomId }),
+  setActiveRoom: (roomId) =>
+    set((state) => ({
+      activeRoom: roomId,
+      roomUiOptions: roomId
+        ? {
+            ...state.roomUiOptions,
+            [roomId]: {
+              pinned: state.roomUiOptions[roomId]?.pinned ?? false,
+              muted: state.roomUiOptions[roomId]?.muted ?? false,
+              unread: false,
+              unreadCount: 0,
+            },
+          }
+        : state.roomUiOptions,
+    })),
 })
 
 const createMessagesSlice: StateCreator<AppState, [], [], MessagesState> = (
@@ -251,6 +295,25 @@ const createMessagesSlice: StateCreator<AppState, [], [], MessagesState> = (
       },
     })),
 
+  removeMessage: (roomId, messageId) =>
+    set((state) => {
+      const currentMessages = state.messages[roomId] ?? []
+      const filtered = currentMessages.filter((m) => m.id !== messageId)
+      const lastMsg = filtered[filtered.length - 1]
+
+      return {
+        messages: {
+          ...state.messages,
+          [roomId]: filtered,
+        },
+        rooms: state.rooms.map((room) =>
+          room.id === roomId && room.lastMessage?.id === messageId
+            ? { ...room, lastMessage: lastMsg }
+            : room
+        ),
+      }
+    }),
+
   clearMessages: (roomId) =>
     set((state) => {
       const messages = { ...state.messages }
@@ -259,6 +322,44 @@ const createMessagesSlice: StateCreator<AppState, [], [], MessagesState> = (
 
       return { messages }
     }),
+})
+
+const createJoinRequestsSlice: StateCreator<
+  AppState,
+  [],
+  [],
+  JoinRequestsState
+> = (set) => ({
+  joinRequests: {},
+  setJoinRequests: (roomId, requests) =>
+    set((state) => ({
+      joinRequests: {
+        ...state.joinRequests,
+        [roomId]: requests,
+      },
+    })),
+  addJoinRequest: (roomId, request) =>
+    set((state) => {
+      const existing = state.joinRequests[roomId] ?? []
+      if (existing.some((r) => r.id === request.id)) {
+        return state
+      }
+      return {
+        joinRequests: {
+          ...state.joinRequests,
+          [roomId]: [request, ...existing],
+        },
+      }
+    }),
+  removeJoinRequest: (roomId, requestId) =>
+    set((state) => ({
+      joinRequests: {
+        ...state.joinRequests,
+        [roomId]: (state.joinRequests[roomId] ?? []).filter(
+          (r) => r.id !== requestId
+        ),
+      },
+    })),
 })
 
 const createHydrationSlice: StateCreator<AppState, [], [], HydrationState> = (
@@ -284,6 +385,7 @@ const createAppActionsSlice: StateCreator<AppState, [], [], AppActions> = (
       activeRoom: null,
       roomUiOptions: {},
       messages: {},
+      joinRequests: {},
     }),
 })
 
@@ -296,6 +398,7 @@ const useAppStore = create<AppState>()(
         ...createUserSlice(...a),
         ...createRoomsSlice(...a),
         ...createMessagesSlice(...a),
+        ...createJoinRequestsSlice(...a),
         ...createHydrationSlice(...a),
         ...createAppActionsSlice(...a),
       }),
@@ -306,6 +409,12 @@ const useAppStore = create<AppState>()(
           rooms: state.rooms,
           activeRoom: state.activeRoom,
           roomUiOptions: state.roomUiOptions,
+          messages: Object.fromEntries(
+            Object.entries(state.messages).map(([roomId, msgs]) => [
+              roomId,
+              msgs.slice(-50),
+            ])
+          ),
         }),
         onRehydrateStorage: () => (state) => {
           state?.setHasHydrated(true)

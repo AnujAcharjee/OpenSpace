@@ -31,6 +31,11 @@ export const getRoomHistory = async (req: Request, res: Response) => {
     },
     include: {
       user: true,
+      parent: {
+        include: {
+          user: true,
+        },
+      },
     },
     orderBy: {
       createdAt: 'asc',

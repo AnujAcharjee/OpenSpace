@@ -14,6 +14,17 @@ const charMessageBaseSchema = z.object({
   attachments: z.string({ message: 'Attachments must be a string' }).optional(), // JSON string
   roomId: z.string({ message: 'Room id must be a string' }),
   parentId: uuidSchema('Parent id must be a valid uuid').optional(),
+  senderUsername: z.string().optional(),
+  senderAvatarUrl: z.string().nullable().optional(),
+  type: messageTypeSchema.optional(),
+  parent: z
+    .object({
+      id: z.string(),
+      text: z.string().optional(),
+      senderUsername: z.string().optional(),
+      isDeleted: z.boolean().optional(),
+    })
+    .optional(),
 });
 
 const messageContentSchema = charMessageBaseSchema.superRefine((body, ctx) => {

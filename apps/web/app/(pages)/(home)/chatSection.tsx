@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import useAppStore from "@/stores/app-store"
@@ -33,6 +33,9 @@ import {
   IconUserPlus,
   IconUsers,
   IconX,
+  IconPhoto,
+  IconAlertCircle,
+  IconCopy,
 } from "@tabler/icons-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
@@ -57,10 +60,12 @@ import type {
 } from "@repo/validation"
 import axios from "axios"
 import type { RoomMessage } from "@/stores/app-store"
-import { type ChatHistoryMessage } from "@/hooks/useMessage"
 import { useRooms } from "@/hooks/useRooms"
+import { type ChatHistoryMessage } from "@/hooks/useMessage"
 import { z } from "zod"
 import { useChatSection } from "@/hooks/useChatSection"
+import { DialogAddMembers } from "@/components/DialogAddMembers"
+import { EmojiPicker } from "@/components/EmojiPicker"
 
 type MessageBubbleParent = {
   id: string
@@ -80,6 +85,7 @@ const toastOptions = {
 }
 
 const EMPTY_ROOM_MESSAGES: RoomMessage[] = []
+const EMPTY_JOIN_REQUESTS: RoomJoinRequestRecord[] = []
 const roomBodySchema = createRoomSchema.shape.body
 
 const editRoomFormSchema = z.object({
@@ -114,6 +120,48 @@ export default function ChatSection({ room }: { room: RoomRecord | null }) {
     getAuthorAvatar,
     getMessageBody,
   } = useChatSection(room)
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const { getPendingJoinRequests: getPendingJoinRequestsRequest } = useRooms()
+  const pendingRequests = useAppStore(
+    (s) => (room ? s.joinRequests[room.id] ?? EMPTY_JOIN_REQUESTS : EMPTY_JOIN_REQUESTS)
+  )
+
+  useEffect(() => {
+    if (replyingTo) {
+      inputRef.current?.focus()
+    }
+  }, [replyingTo])
+
+  const handleScrollToMessage = (targetId?: string) => {
+    if (!targetId) return
+    const el = document.getElementById(`msg-${targetId}`)
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" })
+      el.classList.add("ring-2", "ring-primary/60", "bg-primary/10", "rounded-xl")
+      setTimeout(() => {
+        el.classList.remove("ring-2", "ring-primary/60", "bg-primary/10", "rounded-xl")
+      }, 1400)
+    }
+  }
+
+  useEffect(() => {
+    if (!room || !canManageRoom || !user?.id) return
+    let isCancelled = false
+
+    void getPendingJoinRequestsRequest(room.id, user.id)
+      .then((requests) => {
+        if (!isCancelled) {
+          useAppStore.getState().setJoinRequests(room.id, requests)
+        }
+      })
+      .catch(() => {})
+
+    return () => {
+      isCancelled = true
+    }
+  }, [canManageRoom, getPendingJoinRequestsRequest, room, user?.id])
 
   if (!room) {
     if (!user) {
@@ -121,7 +169,7 @@ export default function ChatSection({ room }: { room: RoomRecord | null }) {
         <div className="h-full w-full p-1.5">
           <Card className="flex h-full w-full flex-col items-center justify-center border border-border/40 bg-card/40 backdrop-blur-md rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.03)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.15)] p-6 text-center">
             <div className="flex flex-col items-center max-w-md space-y-6">
-              <div className="relative flex items-center justify-center py-2">
+              <div className="relative flex items-center justify-center py-4">
                 <div className="pointer-events-none absolute -inset-6 rounded-full bg-[radial-gradient(circle,rgba(244,208,63,0.15)_0%,rgba(212,175,55,0.05)_55%,transparent_70%)] blur-2xl" />
                 <AppIcon size="lg" />
               </div>
@@ -191,11 +239,11 @@ export default function ChatSection({ room }: { room: RoomRecord | null }) {
   return (
     <div className="h-full w-full p-1.5">
       <Card className="flex h-full w-full flex-col gap-0 border border-border/40 bg-card/50 shadow-[0_8px_30px_rgb(0,0,0,0.03)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] backdrop-blur-md rounded-2xl p-0 overflow-hidden">
-        <CardHeader className="flex items-center gap-2 border-b border-border/50 bg-card/40 px-2 pt-3 pb-3 backdrop-blur-sm">
+        <CardHeader className="shrink-0 flex items-center gap-2 border-b border-border/50 bg-card/40 px-3 py-3 backdrop-blur-sm">
           <button
             type="button"
             onClick={() => setActiveRoom(null)}
-            className="group flex items-center justify-center rounded-lg p-1 text-muted-foreground transition-all duration-150 hover:bg-muted hover:text-foreground active:scale-95"
+            className="group flex items-center justify-center rounded-lg p-1 text-muted-foreground transition-all duration-150 hover:bg-muted hover:text-foreground active:scale-95 cursor-pointer"
             aria-label="Go back"
           >
             <IconChevronLeft
@@ -209,13 +257,13 @@ export default function ChatSection({ room }: { room: RoomRecord | null }) {
           <button
             type="button"
             onClick={toggleMembersPanel}
-            className="rounded-lg transition hover:bg-muted/60"
+            className="rounded-lg transition hover:bg-muted/60 cursor-pointer"
             aria-label="View room members"
           >
             <Avatar className="h-8 w-8 shrink-0 border border-border">
-              <AvatarImage src={room.name} alt={room.name} />
-              <AvatarFallback className="text-xs">
-                {room.name[0]}
+              <AvatarImage src={room.avatarUrl ?? undefined} alt={room.name} />
+              <AvatarFallback className="text-xs font-semibold">
+                {room.name[0]?.toUpperCase()}
               </AvatarFallback>
             </Avatar>
           </button>
@@ -223,7 +271,7 @@ export default function ChatSection({ room }: { room: RoomRecord | null }) {
           <button
             type="button"
             onClick={toggleMembersPanel}
-            className="min-w-0 flex-1 rounded-lg px-1 py-0.5 text-left transition hover:bg-muted/60"
+            className="min-w-0 flex-1 rounded-lg px-1 py-0.5 text-left transition hover:bg-muted/60 cursor-pointer"
             aria-label="View room members"
           >
             <div className="text-md truncate tracking-wide text-foreground">
@@ -236,10 +284,28 @@ export default function ChatSection({ room }: { room: RoomRecord | null }) {
             )}
           </button>
 
+          {canManageRoom && pendingRequests.length > 0 && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={toggleMembersPanel}
+              className="h-7 px-2.5 text-xs font-semibold text-primary border-primary/40 bg-primary/10 hover:bg-primary/20 rounded-lg cursor-pointer flex items-center gap-1.5 shadow-xs"
+            >
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
+              </span>
+              <span>
+                {pendingRequests.length} {pendingRequests.length === 1 ? "Request" : "Requests"}
+              </span>
+            </Button>
+          )}
+
           {canManageRoom && <DialogEditRoom room={room} />}
         </CardHeader>
 
-        <CardContent className="min-h-0 flex-1 px-0 py-0 sm:px-1">
+        <CardContent className="min-h-0 flex-1 overflow-hidden px-0 py-0 sm:px-1">
           {showMembersPanel ? (
             <RoomMembersPanel
               room={room}
@@ -248,42 +314,79 @@ export default function ChatSection({ room }: { room: RoomRecord | null }) {
               onShowChat={closeMembersPanel}
             />
           ) : (
-            <ScrollArea className="h-full p-0">
-              <div className="space-y-2 px-3 py-2 sm:px-4">
-                {isLoading && (
-                  <div className="text-center text-sm text-muted-foreground">
-                    Loading messages...
+            <div className="flex h-full min-h-0 flex-col overflow-hidden">
+              {canManageRoom && pendingRequests.length > 0 && (
+                <div className="shrink-0 mx-3 mt-2 flex items-center justify-between rounded-xl border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs text-foreground backdrop-blur-md animate-in fade-in slide-in-from-top-1 duration-200">
+                  <div className="flex items-center gap-2">
+                    <IconUsers size={14} className="text-primary shrink-0" />
+                    <span className="font-medium text-[11px] sm:text-xs">
+                      {pendingRequests.length} pending join {pendingRequests.length === 1 ? "request" : "requests"}
+                    </span>
                   </div>
-                )}
-                {!isLoading && roomMessages.length === 0 && (
-                  <div className="text-center text-sm text-muted-foreground">
-                    No messages yet. Start the conversation.
-                  </div>
-                )}
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 px-2 text-xs font-semibold text-primary hover:bg-primary/20 cursor-pointer"
+                    onClick={toggleMembersPanel}
+                  >
+                    Review requests
+                  </Button>
+                </div>
+              )}
+
+              <ScrollArea className="h-full w-full min-h-0 flex-1">
+                <div className="space-y-2 px-3 py-2 sm:px-4">
+                  {isLoading && (
+                    <div className="text-center text-sm text-muted-foreground py-4">
+                      Loading messages...
+                    </div>
+                  )}
+                  {!isLoading && roomMessages.length === 0 && (
+                    <div className="text-center text-sm text-muted-foreground py-8">
+                      No messages yet. Start the conversation.
+                    </div>
+                  )}
                 {roomMessages.map((message) => {
+                  const isSystemMessage =
+                    message.type === "SYSTEM" ||
+                    message.sender === "SYSTEM" ||
+                    message.sender?.toLowerCase() === "system" ||
+                    message.senderUsername?.toLowerCase() === "system"
+
+                  if (isSystemMessage) {
+                    return (
+                      <SystemMessage
+                        key={message.id}
+                        message={
+                          message.isDeleted ? "Message deleted" : message.text
+                        }
+                        timestamp={formatMessageTime(message.createdAt)}
+                      />
+                    )
+                  }
+
                   const isOwn = message.sender === user?.id
                   const username = getAuthorName(message)
                   const avatar = getAuthorAvatar(message)
-                  const parentMessage = message.parentId
-                    ? roomMessagesById.get(message.parentId)
-                    : undefined
-                  const parentUsername = parentMessage
-                    ? getAuthorName(parentMessage)
-                    : undefined
+                  const parentMsg = message.parent ?? (message.parentId ? roomMessagesById.get(message.parentId) : undefined)
+                  const parentUsername = message.parent?.senderUsername ?? (parentMsg ? getAuthorName(parentMsg as RoomMessage) : undefined)
+                  const hasParent = Boolean(message.parentId || message.parent)
 
                   return (
                     <MessageBubble
                       key={message.id}
+                      id={`msg-${message.id}`}
                       username={username}
                       avatar={avatar}
-                      parentId={message.parentId}
+                      parentId={message.parentId ?? message.parent?.id}
                       parentMessage={
-                        message.parentId
+                        hasParent
                           ? {
-                              id: parentMessage?.id ?? message.parentId,
+                              id: message.parent?.id ?? parentMsg?.id ?? message.parentId ?? "",
                               username: parentUsername ?? "Original message",
-                              message: parentMessage?.text,
-                              isDeleted: parentMessage?.isDeleted,
+                              message: message.parent?.text ?? parentMsg?.text,
+                              isDeleted: message.parent?.isDeleted ?? parentMsg?.isDeleted,
                             }
                           : undefined
                       }
@@ -299,17 +402,19 @@ export default function ChatSection({ room }: { room: RoomRecord | null }) {
                       }
                       onReply={() => setReplyingTo(message)}
                       onDelete={() => void handleDeleteMessage(message.id)}
+                      onJumpToParent={() => handleScrollToMessage(message.parentId ?? message.parent?.id)}
                     />
                   )
                 })}
                 <div ref={messagesEndRef} />
               </div>
             </ScrollArea>
-          )}
-        </CardContent>
+          </div>
+        )}
+      </CardContent>
 
         {!showMembersPanel && (
-          <CardFooter className="flex gap-2 px-3 py-3">
+          <CardFooter className="shrink-0 flex gap-2 px-3 py-3 border-t border-border/40 bg-card/40 backdrop-blur-sm">
             {!user ? (
               <div className="flex w-full items-center justify-between gap-3 rounded-xl border border-border/50 bg-muted/40 px-4 py-2.5">
                 <span className="text-xs text-muted-foreground">
@@ -323,42 +428,72 @@ export default function ChatSection({ room }: { room: RoomRecord | null }) {
                   Sign In
                 </Button>
               </div>
+            ) : user && !room.members.some((m) => m.userId === user.id) ? (
+              <div className="flex w-full max-w-xl mx-auto items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-xs font-medium text-amber-600 dark:text-amber-400">
+                <IconAlertCircle size={16} className="shrink-0" />
+                <span>You have been removed from this room. You can no longer send messages.</span>
+              </div>
             ) : (
               <form
-                className="flex w-full items-end gap-1.5"
+                className="flex w-full max-w-xl mx-auto items-end gap-2"
                 onSubmit={(e) => {
                   e.preventDefault()
                   void sendMessage()
                 }}
               >
-                <div className="flex flex-1 flex-col gap-1.5">
+                <div className="relative flex flex-1 flex-col gap-1.5">
+                  <EmojiPicker
+                    isOpen={showEmojiPicker}
+                    onClose={() => setShowEmojiPicker(false)}
+                    onSelectEmoji={(emoji) => {
+                      setDraft((prev) => prev + emoji)
+                    }}
+                  />
+
+                  {/* Modern Glassmorphic Reply Banner */}
                   {replyingTo && (
-                    <div className="flex items-start justify-between rounded-xl border border-primary/40 bg-muted/30 px-2.5 py-1.5">
-                      <div className="min-w-0 border-l-2 border-primary/70 pl-3">
-                        <div className="text-xs font-medium text-primary">
-                          Replying to {getAuthorName(replyingTo)}
+                    <div className="flex items-center justify-between gap-2.5 rounded-xl border border-primary/40 bg-card/95 dark:bg-card/90 shadow-md backdrop-blur-md px-3 py-2 animate-in slide-in-from-bottom-2 fade-in duration-200">
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary border border-primary/20 shadow-xs">
+                          <IconMessageReply size={14} stroke={2.5} />
                         </div>
-                        <div className="line-clamp-2 text-xs text-muted-foreground">
-                          {getMessageBody(replyingTo)}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5 text-[11px] font-semibold text-primary">
+                            <span>Replying to</span>
+                            <span className="truncate">@{getAuthorName(replyingTo)}</span>
+                          </div>
+                          <div className="line-clamp-1 text-[11px] text-muted-foreground/90 font-normal">
+                            {getMessageBody(replyingTo)}
+                          </div>
                         </div>
                       </div>
                       <button
                         type="button"
                         onClick={clearReply}
-                        className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+                        className="rounded-lg p-1.5 text-muted-foreground transition-all duration-150 hover:bg-muted/80 hover:text-foreground hover:rotate-90 active:scale-95 cursor-pointer shrink-0"
+                        title="Cancel reply (Esc)"
                         aria-label="Cancel reply"
                       >
-                        <IconX size={16} />
+                        <IconX size={15} />
                       </button>
                     </div>
                   )}
 
-                  <InputGroup className="h-9 w-full border border-primary/50">
+                  <InputGroup className="h-9.5 w-full border border-primary/40 bg-background/90 shadow-xs backdrop-blur-sm rounded-xl">
                     <InputGroupInput
+                      ref={inputRef}
                       value={draft}
                       onChange={(e) => setDraft(e.target.value)}
-                      placeholder={`Message ${room.name}`}
-                      disabled={!user || isSending}
+                      placeholder={
+                        !user
+                          ? "Sign in to send messages"
+                          : !room.members.some((m) => m.userId === user.id)
+                            ? "You cannot send messages to this room"
+                            : replyingTo
+                              ? `Reply to @${getAuthorName(replyingTo)}...`
+                              : `Message ${room.name}`
+                      }
+                      disabled={!user || !room.members.some((m) => m.userId === user.id) || isSending}
                     />
                     <InputGroupAddon>
                       <IconPaperclip
@@ -367,19 +502,37 @@ export default function ChatSection({ room }: { room: RoomRecord | null }) {
                         width={20}
                         className="cursor-not-allowed text-muted-foreground/60"
                       />
-                      <IconMoodSmile
-                        stroke={2}
-                        height={20}
-                        width={20}
-                        className="cursor-not-allowed text-muted-foreground/60"
-                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowEmojiPicker((prev) => !prev)}
+                        disabled={!user || !room.members.some((m) => m.userId === user.id) || isSending}
+                        className="rounded p-0.5 text-muted-foreground transition-all hover:text-foreground active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+                        title="Add emoji"
+                        aria-label="Add emoji"
+                      >
+                        <IconMoodSmile
+                          stroke={2}
+                          height={20}
+                          width={20}
+                          className={
+                            showEmojiPicker
+                              ? "text-primary"
+                              : "text-muted-foreground hover:text-foreground"
+                          }
+                        />
+                      </button>
                     </InputGroupAddon>
                     <InputGroupAddon align="inline-end">
                       <InputGroupButton
                         type="submit"
                         variant="ghost"
                         size="icon-sm"
-                        disabled={!user || !draft.trim() || isSending}
+                        disabled={
+                          !user ||
+                          !room.members.some((m) => m.userId === user.id) ||
+                          !draft.trim() ||
+                          isSending
+                        }
                         className="text-muted-foreground hover:text-foreground"
                       >
                         <IconBrandTelegram stroke={2} height={18} width={18} />
@@ -405,7 +558,31 @@ export default function ChatSection({ room }: { room: RoomRecord | null }) {
   )
 }
 
+function SystemMessage({
+  message,
+  timestamp,
+}: {
+  message?: string
+  timestamp: string
+}) {
+  return (
+    <div className="flex w-full items-center justify-center my-2 select-none">
+      <div className="flex items-center gap-1.5 px-2 py-0.5 text-center">
+        <span className="text-[11px] sm:text-xs font-medium text-muted-foreground/80 break-words leading-relaxed">
+          {message?.trim() || "System notification"}
+        </span>
+        {timestamp && (
+          <span className="text-[10px] text-muted-foreground/50 shrink-0">
+            {timestamp}
+          </span>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function MessageBubble({
+  id,
   username,
   avatar,
   parentId,
@@ -416,7 +593,9 @@ function MessageBubble({
   canDelete = false,
   onReply,
   onDelete,
+  onJumpToParent,
 }: {
+  id?: string
   username: string
   avatar?: string
   parentId?: string
@@ -427,6 +606,7 @@ function MessageBubble({
   canDelete?: boolean
   onReply: () => void
   onDelete: () => void
+  onJumpToParent?: () => void
 }) {
   const fallbackMessage = message?.trim() ? message : "Attachment"
   const fallbackParentMessage = parentMessage?.isDeleted
@@ -437,88 +617,171 @@ function MessageBubble({
         ? "Original message unavailable"
         : ""
 
-  return (
-    <ContextMenu>
-      <ContextMenuTrigger asChild>
-        <div
-          className={`flex items-end gap-1.5 ${isOwn ? "flex-row-reverse" : ""}`}
-        >
-          <Avatar className="h-6 w-6 shrink-0 border border-border">
-            <AvatarImage src={avatar} alt={username} />
-            <AvatarFallback className="text-xs">{username[0]}</AvatarFallback>
-          </Avatar>
+  const handleCopy = () => {
+    if (fallbackMessage) {
+      void navigator.clipboard.writeText(fallbackMessage)
+      toast.success("Message copied to clipboard", toastOptions)
+    }
+  }
 
+  return (
+    <div
+      id={id}
+      className={`group relative flex w-full items-end gap-2 px-1 py-0.5 transition-all duration-300 animate-in fade-in-50 slide-in-from-bottom-1 duration-200 ${
+        isOwn ? "justify-end" : "justify-start"
+      }`}
+    >
+      {/* Avatar only shown for other users' messages on the left (WhatsApp style) */}
+      {!isOwn && (
+        <Avatar className="h-7 w-7 shrink-0 border border-border/80 shadow-xs mb-1">
+          <AvatarImage src={avatar} alt={username} />
+          <AvatarFallback className="text-[11px] font-semibold bg-muted text-muted-foreground">
+            {username[0]?.toUpperCase() ?? "U"}
+          </AvatarFallback>
+        </Avatar>
+      )}
+
+      {/* Message Bubble Container with Context Menu on right-click */}
+      <ContextMenu>
+        <ContextMenuTrigger asChild>
           <div
-            className={`flex max-w-[70%] flex-col gap-1 ${isOwn ? "items-end" : "items-start"}`}
+            className={`relative flex min-w-0 max-w-[82%] sm:max-w-[70%] flex-col select-text ${
+              isOwn ? "items-end" : "items-start"
+            }`}
           >
+            {/* Quick Action Floating Bar on Hover */}
             <div
-              className={`rounded-[18px] px-3 py-1.5 text-xs leading-relaxed sm:text-sm ${
-                isOwn
-                  ? "rounded-br-4 bg-primary/80 text-primary-foreground"
-                  : "rounded-bl-4 bg-muted text-foreground"
+              className={`absolute -top-3.5 opacity-0 group-hover:opacity-100 transition-all duration-150 z-10 flex items-center gap-0.5 bg-card/95 backdrop-blur-md border border-border/60 rounded-lg p-0.5 shadow-md ${
+                isOwn ? "left-0" : "right-0"
               }`}
             >
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onReply()
+                }}
+                className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition cursor-pointer"
+                title="Reply"
+                aria-label="Reply"
+              >
+                <IconMessageReply size={13} stroke={2} />
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleCopy()
+                }}
+                className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition cursor-pointer"
+                title="Copy text"
+                aria-label="Copy text"
+              >
+                <IconCopy size={13} stroke={2} />
+              </button>
+              {canDelete && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onDelete()
+                  }}
+                  className="p-1 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition cursor-pointer"
+                  title="Delete"
+                  aria-label="Delete"
+                >
+                  <IconTrash size={13} stroke={2} />
+                </button>
+              )}
+            </div>
+
+            {/* Bubble Box */}
+            <div
+              className={`min-w-0 rounded-2xl px-3.5 py-2 text-xs leading-relaxed sm:text-sm text-foreground bg-muted/80 backdrop-blur-sm transition-all duration-150 ${
+                isOwn
+                  ? "rounded-br-xs border border-[#d4af37] dark:border-[#f5d061] shadow-[0_2px_12px_rgba(244,187,68,0.12)]"
+                  : "rounded-bl-xs border border-blue-500/70 dark:border-blue-400/70 shadow-[0_2px_12px_rgba(59,130,246,0.1)]"
+              }`}
+            >
+              {/* Sender Name for other users inside the bubble (WhatsApp group chat style) */}
+              {!isOwn && (
+                <div className="mb-1 text-[11px] font-semibold text-blue-600 dark:text-blue-400 truncate">
+                  {username}
+                </div>
+              )}
+
+              {/* Reply Quote Snippet */}
               {parentId && parentMessage && (
                 <div
-                  className={`mb-2 rounded-2xl border px-2.5 py-2 text-[11px] shadow-sm sm:text-xs ${
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onJumpToParent?.()
+                  }}
+                  title="Jump to original message"
+                  className={`group/reply mb-2 min-w-0 rounded-xl border-l-[3px] bg-background/50 hover:bg-background/80 dark:bg-background/40 dark:hover:bg-background/70 px-2.5 py-1.5 text-[11px] sm:text-xs transition-all duration-150 cursor-pointer shadow-2xs select-none active:scale-[0.99] ${
                     isOwn
-                      ? "border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground ring-1 ring-primary-foreground/15"
-                      : "border-border/60 bg-background/80 text-muted-foreground"
+                      ? "border-[#d4af37] text-foreground"
+                      : "border-blue-500 text-foreground"
                   }`}
                 >
                   <div
-                    className={`mb-1 flex items-center gap-1.5 ${
-                      isOwn ? "text-primary-foreground/90" : "text-primary"
+                    className={`mb-0.5 flex items-center justify-between gap-1.5 font-semibold text-[11px] ${
+                      isOwn
+                        ? "text-[#d4af37] dark:text-[#f5d061]"
+                        : "text-blue-600 dark:text-blue-400"
                     }`}
                   >
-                    <IconMessageReply size={12} />
-                    <span className="font-semibold">
-                      Replying to {parentMessage.username}
-                    </span>
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <IconMessageReply size={11} stroke={2.5} className="shrink-0" />
+                      <span className="truncate">{parentMessage.username}</span>
+                    </div>
+                    <span className="text-[9px] opacity-0 group-hover/reply:opacity-80 transition-opacity shrink-0">Jump</span>
                   </div>
-                  <div className="line-clamp-2 leading-relaxed break-words">
+                  <div className="line-clamp-2 leading-relaxed break-words [overflow-wrap:anywhere] font-normal text-muted-foreground">
                     {fallbackParentMessage}
                   </div>
                 </div>
               )}
-              <div className="break-words whitespace-pre-wrap font-bold">
+
+              {/* Message text */}
+              <div className="break-words [overflow-wrap:anywhere] whitespace-pre-wrap selection:bg-primary/20">
                 {fallbackMessage}
               </div>
-            </div>
-            <div>
-              {!isOwn && (
-                <span className="px-1 text-[11px] text-muted-foreground">
-                  {username}
+
+              {/* Timestamp at bottom right inside the bubble */}
+              <div className="mt-1 flex items-center justify-end gap-1 select-none">
+                <span className="text-[10px] text-muted-foreground/80 shrink-0">
+                  {timestamp}
                 </span>
-              )}
-              <span className="px-1 text-[10px] text-muted-foreground">
-                {timestamp}
-              </span>
+              </div>
             </div>
           </div>
-        </div>
-      </ContextMenuTrigger>
+        </ContextMenuTrigger>
 
-      <ContextMenuContent className="w-44">
-        <ContextMenuItem onSelect={onReply}>
-          <IconMessageReply />
-          Reply
-        </ContextMenuItem>
-        <ContextMenuItem
-          onSelect={onDelete}
-          disabled={!canDelete}
-          className="text-destructive focus:text-destructive"
-        >
-          <IconTrash />
-          Delete
-        </ContextMenuItem>
-        <ContextMenuSeparator />
-        <ContextMenuItem disabled={true}>
-          <IconPinned />
-          Pin
-        </ContextMenuItem>
-      </ContextMenuContent>
-    </ContextMenu>
+        <ContextMenuContent className="w-48 rounded-xl shadow-xl border border-border/60 bg-popover/95 backdrop-blur-md p-1.5 z-50">
+          <ContextMenuItem onSelect={onReply} className="gap-2.5 cursor-pointer py-1.5 text-xs font-medium">
+            <IconMessageReply size={15} className="text-primary" />
+            <span>Reply</span>
+          </ContextMenuItem>
+          <ContextMenuItem onSelect={handleCopy} className="gap-2.5 cursor-pointer py-1.5 text-xs font-medium">
+            <IconCopy size={15} className="text-muted-foreground" />
+            <span>Copy text</span>
+          </ContextMenuItem>
+          {canDelete && (
+            <>
+              <ContextMenuSeparator className="my-1 opacity-50" />
+              <ContextMenuItem
+                onSelect={onDelete}
+                className="gap-2.5 text-destructive focus:text-destructive focus:bg-destructive/10 cursor-pointer py-1.5 text-xs font-medium"
+              >
+                <IconTrash size={15} />
+                <span>Delete message</span>
+              </ContextMenuItem>
+            </>
+          )}
+        </ContextMenuContent>
+      </ContextMenu>
+    </div>
   )
 }
 
@@ -528,6 +791,8 @@ function DialogEditRoom({ room }: { room: RoomRecord }) {
   const [open, setOpen] = useState(false)
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(room.avatarUrl ?? null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const defaultValues: EditRoomFormInput = {
     name: room.name,
@@ -539,7 +804,7 @@ function DialogEditRoom({ room }: { room: RoomRecord }) {
     {
       name: "name",
       label: "Room Name",
-      placeholder: "my room",
+      placeholder: "room-name",
       autoComplete: "off",
     },
     {
@@ -559,11 +824,28 @@ function DialogEditRoom({ room }: { room: RoomRecord }) {
     },
   ]
 
+  function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("Image must be smaller than 2MB", toastOptions)
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      setAvatarUrl(reader.result as string)
+    }
+    reader.readAsDataURL(file)
+  }
+
   async function handleUpdateRoom(data: EditRoomFormInput) {
     try {
       const payload: EditRoomRequest["body"] = {
         name: data.name,
         description: data.description,
+        avatarUrl,
         isPrivate: data.isPrivate === "true",
       }
       const updatedRoom = await updateRoomRequest(room.id, payload)
@@ -634,11 +916,49 @@ function DialogEditRoom({ room }: { room: RoomRecord }) {
           <DialogHeader>
             <DialogTitle>Edit Room</DialogTitle>
             <DialogDescription>
-              Update the room name, description, or visibility.
+              Update the room name, description, avatar, or visibility.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-3">
+            <div className="flex flex-col items-center justify-center gap-2 pt-1 pb-1">
+              <Avatar className="h-16 w-16 border-2 border-primary/30 shadow-md">
+                <AvatarImage src={avatarUrl ?? undefined} />
+                <AvatarFallback className="bg-muted text-lg font-bold text-muted-foreground">
+                  <IconPhoto size={28} />
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex items-center gap-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleFileChange}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs rounded-lg cursor-pointer"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  Change Room Icon
+                </Button>
+                {avatarUrl && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-xs text-destructive hover:text-destructive cursor-pointer"
+                    onClick={() => setAvatarUrl(null)}
+                  >
+                    <IconTrash size={14} className="mr-1" /> Remove
+                  </Button>
+                )}
+              </div>
+            </div>
+
             <AppForm
               key={`${room.id}-${room.updatedAt}`}
               formId={`edit-room-form-${room.id}`}
@@ -717,13 +1037,17 @@ function RoomMembersPanel({
     getPendingJoinRequests: getPendingJoinRequestsRequest,
     respondJoinRequest: respondJoinRequestRequest,
   } = useRooms()
+
+  const pendingRequests = useAppStore(
+    (s) => s.joinRequests[room.id] ?? EMPTY_JOIN_REQUESTS
+  )
+  const setStoreJoinRequests = useAppStore((s) => s.setJoinRequests)
+  const removeStoreJoinRequest = useAppStore((s) => s.removeJoinRequest)
+
   const [addMembersOpen, setAddMembersOpen] = useState(false)
   const [removeTarget, setRemoveTarget] = useState<RoomMemberRecord | null>(
     null
   )
-  const [pendingRequests, setPendingRequests] = useState<
-    RoomJoinRequestRecord[]
-  >([])
   const [isLoadingPending, setIsLoadingPending] = useState(false)
   const [processingRequestId, setProcessingRequestId] = useState<string | null>(
     null
@@ -734,7 +1058,6 @@ function RoomMembersPanel({
 
   useEffect(() => {
     if (!canManageRoom || !currentUserId) {
-      setPendingRequests([])
       return
     }
 
@@ -750,7 +1073,7 @@ function RoomMembersPanel({
         )
 
         if (!isCancelled) {
-          setPendingRequests(requests)
+          setStoreJoinRequests(room.id, requests)
         }
       } catch (error) {
         if (!isCancelled) {
@@ -774,7 +1097,7 @@ function RoomMembersPanel({
     return () => {
       isCancelled = true
     }
-  }, [canManageRoom, currentUserId, getPendingJoinRequestsRequest, room.id])
+  }, [canManageRoom, currentUserId, getPendingJoinRequestsRequest, room.id, setStoreJoinRequests])
 
   async function handleAddMembers() {
     const usernames = usernamesInput
@@ -864,9 +1187,7 @@ function RoomMembersPanel({
         useAppStore.getState().upsertRoom(result.room)
       }
 
-      setPendingRequests((current) =>
-        current.filter((request) => request.id !== requestId)
-      )
+      removeStoreJoinRequest(room.id, requestId)
       toast.success(
         approve ? "Join request approved" : "Join request rejected",
         toastOptions
@@ -886,8 +1207,8 @@ function RoomMembersPanel({
 
   return (
     <>
-      <div className="flex h-full flex-col">
-        <div className="flex items-center justify-between border-b border-border/50 px-3 py-2 sm:px-4">
+      <div className="flex h-full min-h-0 flex-col overflow-hidden">
+        <div className="shrink-0 flex items-center justify-between border-b border-border/50 px-3 py-2 sm:px-4">
           <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
             <IconUsers size={16} />
             Members ({room.members.length})
@@ -915,7 +1236,7 @@ function RoomMembersPanel({
           </div>
         </div>
 
-        <ScrollArea className="h-full">
+        <ScrollArea className="h-full w-full min-h-0 flex-1">
           <div className="space-y-2 px-3 py-2 sm:px-4">
             {canManageRoom && (
               <div className="rounded-lg border border-border/40 bg-card/40 p-2">
@@ -1033,34 +1354,11 @@ function RoomMembersPanel({
         </ScrollArea>
       </div>
 
-      <Dialog open={addMembersOpen} onOpenChange={setAddMembersOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Add members</DialogTitle>
-            <DialogDescription>
-              Add one or more usernames. Use @username and separate multiple
-              users with comma or space.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-3">
-            <input
-              value={usernamesInput}
-              onChange={(event) => setUsernamesInput(event.target.value)}
-              placeholder="@alice, @bob"
-              className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none"
-            />
-            <Button
-              type="button"
-              className="w-full"
-              onClick={() => void handleAddMembers()}
-              disabled={isAdding || !usernamesInput.trim()}
-            >
-              {isAdding ? "Adding..." : "Add member"}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <DialogAddMembers
+        room={room}
+        open={addMembersOpen}
+        onOpenChange={setAddMembersOpen}
+      />
 
       <Dialog
         open={Boolean(removeTarget)}

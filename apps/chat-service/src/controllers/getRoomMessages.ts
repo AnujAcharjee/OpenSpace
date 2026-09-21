@@ -35,6 +35,11 @@ export const getRoomMessages = async (req: Request, res: Response) => {
       },
       include: {
         user: true,
+        parent: {
+          include: {
+            user: true,
+          },
+        },
       },
       orderBy: {
         createdAt: 'asc',

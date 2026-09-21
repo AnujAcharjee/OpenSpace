@@ -8,14 +8,41 @@ export const deleteRoom = async (req: Request, res: Response) => {
   const { id } = req.params as DeleteRoomInput['params'];
 
   try {
+    const room = await prisma.chatRoom.findUnique({
+      where: { id },
+      include: {
+        members: true,
+      },
+    });
+
+    if (!room) {
+      throw new AppError('Room not found', 404);
+    }
+
+    const memberUserIds = room.members.map((m) => m.userId);
+
     await prisma.chatRoom.delete({
       where: { id },
     });
 
     try {
       await redis.del(`room:${id}:members`);
+
+      const deletePayload = JSON.stringify({
+        type: 'room_deleted',
+        payload: {
+          roomId: id,
+          roomName: room.name,
+        },
+      });
+
+      // Notify all room members directly via user channel and room channel
+      for (const memberId of memberUserIds) {
+        await redis.publish(`user:${memberId}`, deletePayload);
+      }
+      await redis.publish(`room:${id}`, deletePayload);
     } catch {
-      // Non-blocking cache eviction
+      // Non-blocking cache and publish
     }
 
     return res.status(200).json({

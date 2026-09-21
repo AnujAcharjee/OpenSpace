@@ -1,7 +1,7 @@
 import type { Request, Response } from 'express';
 import type { RespondJoinRequestRequest as RespondJoinRequestInput } from '@repo/validation';
 import crypto from 'crypto';
-import { prisma, RoomMemberRole } from '@repo/db';
+import { prisma, RoomMemberRole, MessageType } from '@repo/db';
 import { redis } from '../../lib/redis.js';
 import { toRoomRecord } from '../@helpers.js';
 import { AppError } from '../../utils/appError.js';
@@ -21,6 +21,7 @@ export const respondJoinRequestController = async (req: Request, res: Response) 
   const joinRequest = await prisma.chatRoomJoinRequest.findUnique({
     where: { id: requestId },
     include: {
+      user: true,
       chatRoom: {
         include: {
           members: true,
@@ -93,13 +94,79 @@ export const respondJoinRequestController = async (req: Request, res: Response) 
     },
   });
 
+  const roomRecord = updatedRoom ? toRoomRecord(updatedRoom) : null;
+
+  if (approve && roomRecord) {
+    const joiningUser = joinRequest.user ?? (await prisma.user.findUnique({ where: { id: joinRequest.userId } }));
+    const username = joiningUser?.username || joiningUser?.name || 'A user';
+    const systemMessageId = crypto.randomUUID();
+    const systemMessageText = `@${username} joined the room`;
+
+    try {
+      await prisma.chatMessage.create({
+        data: {
+          id: systemMessageId,
+          roomId: joinRequest.roomId,
+          userId: joinRequest.userId,
+          type: MessageType.SYSTEM,
+          text: systemMessageText,
+          updatedAt: new Date(),
+        },
+      });
+
+      await redis.publish(
+        `user:${joinRequest.userId}`,
+        JSON.stringify({
+          type: 'room_joined',
+          payload: { room: roomRecord },
+        }),
+      );
+      await redis.publish(
+        `user:${joinRequest.userId}`,
+        JSON.stringify({
+          type: 'notification',
+          payload: {
+            title: 'Join Request Approved',
+            body: `Your request to join #${updatedRoom?.name} was approved!`,
+            timestamp: Date.now(),
+          },
+        }),
+      );
+      await redis.publish(
+        `room:${joinRequest.roomId}`,
+        JSON.stringify({
+          type: 'room_updated',
+          payload: { room: roomRecord },
+        }),
+      );
+      await redis.publish(
+        `room:${joinRequest.roomId}`,
+        JSON.stringify({
+          type: 'chat_message',
+          payload: {
+            id: systemMessageId,
+            sender: joinRequest.userId,
+            text: systemMessageText,
+            roomId: joinRequest.roomId,
+            createdAt: new Date().toISOString(),
+            senderUsername: username,
+            senderAvatarUrl: joiningUser?.avatarUrl ?? null,
+            type: 'SYSTEM',
+          },
+        }),
+      );
+    } catch {
+      // Non-blocking notification
+    }
+  }
+
   return res.status(200).json({
     success: true,
     message: approve ? 'Join request approved' : 'Join request rejected',
     data: {
       success: true,
       requestId,
-      room: updatedRoom ? toRoomRecord(updatedRoom) : null,
+      room: roomRecord,
     },
   });
 };

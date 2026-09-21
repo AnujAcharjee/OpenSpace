@@ -2,37 +2,36 @@ import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
 
-// Helper to load env candidates
-const envCandidateFiles = [
-  '.env.development.local',
-  '.env.local',
-  '.env.development',
-  '.env',
-];
-
-for (const file of envCandidateFiles) {
-  const localEnvPath = path.resolve(process.cwd(), file);
-  if (fs.existsSync(localEnvPath)) {
-    dotenv.config({ path: localEnvPath });
+// 1. Load base .env from current and parent directories
+let currentDir = process.cwd();
+for (let i = 0; i < 4; i++) {
+  const baseEnvPath = path.resolve(currentDir, '.env');
+  if (fs.existsSync(baseEnvPath)) {
+    dotenv.config({ path: baseEnvPath });
   }
+  const parentDir = path.dirname(currentDir);
+  if (parentDir === currentDir) break;
+  currentDir = parentDir;
 }
 
-// 2. If DATABASE_URL is not set, attempt to load from parent monorepo directories
-if (!process.env.DATABASE_URL) {
-  let currentDir = process.cwd();
-  for (let i = 0; i < 4; i++) {
-    for (const file of envCandidateFiles) {
-      const candidatePath = path.resolve(currentDir, file);
-      if (fs.existsSync(candidatePath)) {
-        dotenv.config({ path: candidatePath });
-        if (process.env.DATABASE_URL) break;
-      }
+// 2. Override with local development files in standard precedence order
+const overrideFiles = [
+  '.env.development',
+  '.env.local',
+  '.env.development.local',
+];
+
+currentDir = process.cwd();
+for (let i = 0; i < 4; i++) {
+  for (const file of overrideFiles) {
+    const candidatePath = path.resolve(currentDir, file);
+    if (fs.existsSync(candidatePath)) {
+      dotenv.config({ path: candidatePath, override: true });
     }
-    if (process.env.DATABASE_URL) break;
-    const parentDir = path.dirname(currentDir);
-    if (parentDir === currentDir) break;
-    currentDir = parentDir;
   }
+  const parentDir = path.dirname(currentDir);
+  if (parentDir === currentDir) break;
+  currentDir = parentDir;
 }
 
 export interface DbEnv {

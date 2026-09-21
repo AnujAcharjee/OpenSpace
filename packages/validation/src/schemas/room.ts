@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { userResponseSchema } from './user.js';
+import { chatMessagePayloadSchema } from './chat.js';
 
 const uuidSchema = (message: string) => z.string().uuid({ message });
 const isoDatetimeSchema = (message: string) => z.string().datetime({ message });
@@ -19,6 +20,7 @@ export const createRoomSchema = z.object({
   body: z.object({
     name: roomNameSchema,
     description: roomDescriptionSchema.optional(),
+    avatarUrl: z.string().nullable().optional(),
     isPrivate: z.boolean({ message: 'isPrivate must be a boolean' }),
     creatorId: uuidSchema('creatorId must be a valid UUID').optional(),
   }),
@@ -30,10 +32,16 @@ const editRoomBodySchema = z
   .object({
     name: roomNameSchema.optional(),
     description: roomDescriptionSchema.optional(),
+    avatarUrl: z.string().nullable().optional(),
     isPrivate: z.boolean({ message: 'isPrivate must be a boolean' }).optional(),
   })
   .superRefine((body, ctx) => {
-    if (body.name === undefined && body.description === undefined && body.isPrivate === undefined) {
+    if (
+      body.name === undefined &&
+      body.description === undefined &&
+      body.avatarUrl === undefined &&
+      body.isPrivate === undefined
+    ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: 'Provide at least one field to update',
@@ -174,12 +182,14 @@ export const roomResponseSchema = z.object({
   id: uuidSchema('id must be a valid UUID'),
   name: z.string().min(1).max(100),
   description: z.string().nullable(),
+  avatarUrl: z.string().nullable().optional(),
   isPrivate: z.boolean(),
   creatorId: uuidSchema('creatorId must be a valid UUID').nullable(),
   createdAt: isoDatetimeSchema('createdAt must be a valid ISO datetime'),
   updatedAt: isoDatetimeSchema('updatedAt must be a valid ISO datetime'),
   creator: userResponseSchema.nullable(),
   members: z.array(roomMemberResponseSchema),
+  lastMessage: chatMessagePayloadSchema.nullable().optional(),
 });
 
 export type RoomRecord = z.infer<typeof roomResponseSchema>;

@@ -14,6 +14,9 @@ const { mockRedis, mockPrisma } = vi.hoisted(() => ({
     chatRoom: {
       findMany: vi.fn(),
       findUnique: vi.fn(),
+      findFirst: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
     },
     chatRoomMember: {
       findUnique: vi.fn(),
@@ -24,6 +27,9 @@ const { mockRedis, mockPrisma } = vi.hoisted(() => ({
       findUnique: vi.fn(),
       create: vi.fn(),
       upsert: vi.fn(),
+    },
+    user: {
+      findUnique: vi.fn(),
     },
   },
 }));
@@ -38,6 +44,15 @@ vi.mock('../lib/redis.js', () => ({
 
 vi.mock('@repo/db', () => ({
   prisma: mockPrisma,
+  Prisma: {
+    PrismaClientKnownRequestError: class PrismaClientKnownRequestError extends Error {
+      code: string;
+      constructor(message: string, { code }: { code: string }) {
+        super(message);
+        this.code = code;
+      }
+    },
+  },
   RoomMemberRole: {
     MEMBER: 'MEMBER',
     ADMIN: 'ADMIN',
@@ -61,6 +76,7 @@ vi.mock('../../utils/logger.js', () => ({
 
 import { searchRooms } from '../controllers/room/searchRooms.js';
 import { requestJoinRoomController } from '../controllers/room/requestJoinRoom.js';
+import { createRoom } from '../controllers/room/createRoom.js';
 
 describe('HTTP Service - Room Search & Join', () => {
   beforeEach(() => {
@@ -255,6 +271,68 @@ describe('HTTP Service - Room Search & Join', () => {
           data: expect.objectContaining({
             pending: true,
             joined: false,
+          }),
+        }),
+      );
+    });
+  });
+
+  describe('createRoom Controller', () => {
+    it('should reject room creation if room name already exists', async () => {
+      mockPrisma.chatRoom.findFirst.mockResolvedValueOnce({
+        id: 'existing-room-1',
+        name: 'General',
+      });
+
+      const req = {
+        body: { name: 'General', isPrivate: false },
+        user: { id: 'u-1' },
+      } as unknown as Request;
+
+      const res = createMockRes();
+
+      await createRoom(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(409);
+      expect(res.json).toHaveBeenCalledWith({
+        success: false,
+        error: 'A room with this name already exists',
+      });
+      expect(mockPrisma.chatRoom.create).not.toHaveBeenCalled();
+    });
+
+    it('should create room with unique name and return 201', async () => {
+      mockPrisma.chatRoom.findFirst.mockResolvedValueOnce(null);
+      mockPrisma.chatRoom.create.mockResolvedValueOnce({
+        id: 'new-room-1',
+        name: 'Unique Room',
+        description: null,
+        isPrivate: false,
+        creatorId: 'u-1',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        creator: { id: 'u-1', username: 'alice', avatarUrl: null },
+        members: [],
+      });
+
+      const req = {
+        body: { name: 'Unique Room', isPrivate: false },
+        user: { id: 'u-1' },
+      } as unknown as Request;
+
+      const res = createMockRes();
+
+      await createRoom(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(201);
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: true,
+          message: 'Room created successfully',
+          data: expect.objectContaining({
+            room: expect.objectContaining({
+              name: 'Unique Room',
+            }),
           }),
         }),
       );
