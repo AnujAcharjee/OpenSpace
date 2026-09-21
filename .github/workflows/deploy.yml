@@ -82,31 +82,31 @@ jobs:
             git fetch origin main
             git reset --hard origin/main
 
-            # Write production .env file from GitHub Secrets
+            # Write production .env file (Safe public URIs/configs directly defined + secrets for credentials)
             cat << 'EOF' > .env
             NODE_ENV=production
-            API_DOMAIN=${{ secrets.API_DOMAIN }}
-            ACME_EMAIL=${{ secrets.ACME_EMAIL }}
+            API_DOMAIN=${{ secrets.API_DOMAIN || 'api.collab.anujacharjee.com' }}
+            ACME_EMAIL=${{ secrets.ACME_EMAIL || 'anujacharjee37@gmail.com' }}
 
-            # Serverless Databases
+            # Serverless Databases (Sensitive)
             REDIS_URL=${{ secrets.REDIS_URL }}
             DATABASE_URL=${{ secrets.DATABASE_URL }}
 
-            # Vercel Frontend Allowed Origin
-            WEB_APP_URL=${{ secrets.WEB_APP_URL }}
+            # Frontend Allowed Origin & Cookie Settings (Public / Non-sensitive)
+            WEB_APP_URL=${{ secrets.WEB_APP_URL || 'https://collab.anujacharjee.com' }}
+            COOKIE_DOMAIN=${{ secrets.COOKIE_DOMAIN || '.anujacharjee.com' }}
+            COOKIE_SAME_SITE=${{ secrets.COOKIE_SAME_SITE || 'lax' }}
+            ACCESS_TOKEN_COOKIE_NAME=${{ secrets.ACCESS_TOKEN_COOKIE_NAME || 'accessToken' }}
 
-            # Application Secrets
+            # Application Secrets (Sensitive)
             JWT_SECRET=${{ secrets.JWT_SECRET }}
             GATEWAY_INTERNAL_SECRET=${{ secrets.GATEWAY_INTERNAL_SECRET }}
-            ACCESS_TOKEN_COOKIE_NAME=${{ secrets.ACCESS_TOKEN_COOKIE_NAME || 'accessToken' }}
-            COOKIE_DOMAIN=${{ secrets.COOKIE_DOMAIN }}
-            COOKIE_SAME_SITE=${{ secrets.COOKIE_SAME_SITE || 'lax' }}
 
-            # Pramaan OAuth Credentials
+            # Pramaan OAuth (Public endpoints + Sensitive Credentials)
             PRAMAAN_CLIENT_ID=${{ secrets.PRAMAAN_CLIENT_ID }}
             PRAMAAN_SECRET=${{ secrets.PRAMAAN_CLIENT_SECRET || secrets.PRAMAAN_SECRET }}
-            PRAMAAN_SERVER_URL=${{ secrets.PRAMAAN_SERVER_URL }}
-            CALLBACK_URL=${{ secrets.CALLBACK_URL }}
+            PRAMAAN_SERVER_URL=${{ secrets.PRAMAAN_SERVER_URL || 'https://pramaan.anujacharjee.com' }}
+            CALLBACK_URL=${{ secrets.CALLBACK_URL || 'https://api.collab.anujacharjee.com/api/v1/auth/pramaan/callback' }}
             EOF
 
             # Build and start all 4 microservices + Caddy in detached mode
