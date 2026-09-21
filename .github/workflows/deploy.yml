@@ -7,8 +7,19 @@ on:
     paths-ignore:
       - 'apps/web/**'
       - '**/*.md'
+      - '**/*.svg'
+      - '**/*.png'
+      - '**/*.ico'
+      - 'LICENSE'
       - '.gitignore'
       - '.prettier*'
+      - '.vscode/**'
+      - '**/.env.example'
+      - '**/.env.development.local'
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
@@ -18,15 +29,16 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 20
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
       - name: Setup PNPM
         uses: pnpm/action-setup@v4
         with:
           version: 10.33.0
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
 
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
@@ -34,14 +46,8 @@ jobs:
       - name: Generate Prisma Client
         run: pnpm --filter @repo/db exec prisma generate
 
-      - name: Build Packages & Services
-        run: pnpm turbo run build --filter=!web
-
-      - name: Run Automated Tests
-        run: pnpm test
-
-      - name: Run TypeScript Checks
-        run: pnpm check-types
+      - name: Build, Test & Type Check
+        run: pnpm turbo run build test check-types --filter=!web
 
   deploy:
     name: Deploy to EC2 via SSH
@@ -72,11 +78,7 @@ jobs:
             fi
 
             # Navigate to project root directory
-            if [ -d "$HOME/Collab/monorepo" ]; then
-              cd "$HOME/Collab/monorepo"
-            else
-              cd "$HOME/Collab"
-            fi
+            cd "$HOME/Collab"
 
             # Pull latest code from main
             git fetch origin main
@@ -109,9 +111,12 @@ jobs:
             CALLBACK_URL=${{ secrets.CALLBACK_URL || 'https://api.collab.anujacharjee.com/api/v1/auth/pramaan/callback' }}
             EOF
 
-            # Build and start all 4 microservices + Caddy in detached mode
+            # 1. Stop backend services and remove old containers (keep Caddy running)
+            docker compose stop api-gateway http-service chat-service ws-service || true
+            docker compose rm -f api-gateway http-service chat-service ws-service || true
+
+            # 2. Build and start all services in detached mode (using cached layers)
             docker compose up -d --build --remove-orphans
 
-            # Aggressively clean old images and build cache to keep disk usage minimal (< 1.5 GB)
-            docker image prune -af --filter "until=24h" || true
-            docker builder prune -af --filter "until=24h" || true
+            # 3. Clean untagged dangling images after deployment
+            docker image prune -f || true

@@ -28,15 +28,20 @@ coverage
 out/
 build
 dist
+*.tsbuildinfo
 
+# PNPM & Package Stores
+.pnpm-store
 
-# Debug
+# Debug & Logs
 npm-debug.log*
 yarn-debug.log*
-yarn-error.log*
+pnpm-debug.log*
+*.log
 
-# Misc
+# OS & Misc
 .DS_Store
+Thumbs.db
 *.pem
 
 # Prisma

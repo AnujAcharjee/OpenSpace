@@ -37,10 +37,6 @@ app.get('/health', (_req: Request, res: Response) => {
   res.status(200).json({ status: 'ok' });
 });
 
-app.use((req, _res, next) => {
-  console.log('[HTTP-SERVICE] Incoming:', req.method, req.path);
-  next();
-});
 
 app.use('/api/v1/auth', requireGatewaySecret, authRouter);
 app.use('/api/v1/users', requireGatewaySecret, attachUserContext, userRouter);

@@ -3,6 +3,7 @@ import { createProxyMiddleware, fixRequestBody } from 'http-proxy-middleware';
 import type { ClientRequest, IncomingMessage } from 'http';
 
 import { roundRobin } from './roundRobin.js';
+import { logger } from '../lib/logger.js';
 
 type ServiceProxyOptions = {
   urls: string[];
@@ -13,7 +14,6 @@ type ServiceProxyOptions = {
 
 export function createServiceProxy({
   urls,
-  // pathRewriteBase,
   internalSecret,
   ws,
 }: ServiceProxyOptions) {
@@ -23,35 +23,18 @@ export function createServiceProxy({
     changeOrigin: true,
     ws: Boolean(ws),
 
-    router: (req: Request) => {
-      const target = pickTarget();
-      console.log('[PROXY][ROUTER]', {
-        url: req.originalUrl,
-        target,
-      });
-      return target;
+    router: () => {
+      return pickTarget();
     },
 
-    pathRewrite: (path: string, req: unknown) => {
-      const r = req as any;
-      const originalUrl = r.originalUrl || r.url || '';
-      console.log('[PROXY][PATH_REWRITE]', {
-        expressStripped: path,
-        restored: originalUrl,
-      });
-      return originalUrl;
+    pathRewrite: (_path: string, req: unknown) => {
+      const r = req as Request;
+      return r.originalUrl || r.url || '';
     },
 
     on: {
       proxyReq(proxyReq: ClientRequest, req: unknown) {
         const r = req as Request;
-
-        console.log('[PROXY][OUTGOING_REQ]', {
-          method: r.method,
-          originalUrl: r.originalUrl,       
-          target: proxyReq.getHeader('host'),
-          headers: r.headers,
-        });
 
         if (r.requestId) {
           proxyReq.setHeader('x-request-id', r.requestId);
@@ -81,29 +64,26 @@ export function createServiceProxy({
         const r = req as Request;
         const response = res as Response;
 
-        console.log('[PROXY][INCOMING_RES]', {
-          method: r.method,
-          url: r.originalUrl,
-          statusCode: proxyRes.statusCode,
-          headers: proxyRes.headers,
-        });
-
         if (r.requestId) {
           response.setHeader('x-request-id', r.requestId);
         }
       },
 
-      error(err: Error, req: unknown, res: unknown) {
+      error(err: Error, req: unknown) {
         const r = req as Request;
 
-        console.error('[PROXY][ERROR]', {
-          url: r?.originalUrl,
-          method: r?.method,
-          error: err.message,
-        });
+        logger.error(
+          {
+            url: r?.originalUrl,
+            method: r?.method,
+            err,
+          },
+          'Proxy forwarding error',
+        );
       },
     },
 
-    logLevel: 'debug',
+    logLevel: process.env.NODE_ENV === 'production' ? 'warn' : 'debug',
   });
 }
+

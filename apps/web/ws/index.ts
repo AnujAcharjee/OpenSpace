@@ -38,7 +38,6 @@ class Ws {
     )
 
     setTimeout(() => {
-      console.log("WS re-connecting...")
       this.connect(user)
     }, delay)
   }
@@ -70,7 +69,6 @@ class Ws {
 
       ticket = res.data.ticket
     } catch {
-      console.error("WS ticket fetch failed")
       this.#reconnect(user)
       return
     }
@@ -80,7 +78,6 @@ class Ws {
     // event listeners
     this.#ws.onopen = () => {
       this.#reconnectAttempts = 0
-      console.log("WS connection established successfully 🎉🎉")
     }
 
     this.#ws.onmessage = (event) => {
@@ -100,7 +97,6 @@ class Ws {
     }
 
     this.#ws.onclose = (event) => {
-      console.log("WS closed", { code: event.code, reason: event.reason })
       this.#ws = null
 
       // avoid reconnect on intentional close

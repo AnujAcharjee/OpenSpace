@@ -10,8 +10,6 @@ export const handlers: Record<string, (payload: unknown) => void> = {
     try {
       const message = chatMessagePayloadSchema.parse(payload)
       const { addMessage, updateRoomLastMessage } = useAppStore.getState()
-
-      console.log(message)
       addMessage(message.roomId, message)
       updateRoomLastMessage(message.roomId, message)
     } catch {}

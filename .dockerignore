@@ -1,12 +1,44 @@
+# Dependencies & Package Managers
 node_modules
 .pnpm-store
+.npm
+.pnp
+.pnp.js
+
+# Version Control & IDEs
 .git
+.gitignore
+.vscode
+.idea
+
+# Build Outputs & Caches
 .turbo
 .next
 dist
+build
 generated
+*.tsbuildinfo
+
+# Frontend heavy static assets (not needed for backend container builds)
 apps/web/.next
 apps/web/public
+
+# Tests & Coverage
+coverage
+__tests__
+*.test.ts
+*.test.js
+*.spec.ts
+*.spec.js
+
+# Logs & Environment Files
 *.log
+.env
 .env.local
 .env.*.local
+!.env.example
+
+# Docs & OS Files
+*.md
+.DS_Store
+Thumbs.db
