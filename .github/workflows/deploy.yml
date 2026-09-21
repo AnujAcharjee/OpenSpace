@@ -46,8 +46,11 @@ jobs:
       - name: Generate Prisma Client
         run: pnpm --filter @repo/db exec prisma generate
 
-      - name: Build, Test & Type Check
-        run: pnpm turbo run build test check-types --filter=!web
+      - name: Build & Type Check
+        run: pnpm turbo run build check-types --filter=!web
+
+      - name: Run Automated Tests
+        run: pnpm test
 
   deploy:
     name: Deploy to EC2 via SSH
