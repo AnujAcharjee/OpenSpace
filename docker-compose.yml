@@ -49,6 +49,8 @@ services:
       - WEB_APP_URL=${WEB_APP_URL}
       - GATEWAY_INTERNAL_SECRET=${GATEWAY_INTERNAL_SECRET}
       - ACCESS_TOKEN_COOKIE_NAME=${ACCESS_TOKEN_COOKIE_NAME:-collab_token}
+      - PRAMAAN_CLIENT_ID=${PRAMAAN_CLIENT_ID}
+      - PRAMAAN_SERVER_URL=${PRAMAAN_SERVER_URL}
     depends_on:
       - http-service
       - chat-service

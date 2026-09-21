@@ -46,6 +46,13 @@ jobs:
   deploy:
     name: Deploy to EC2 via SSH
     needs: test
+    if: >-
+      !contains(github.event.head_commit.message, '[skip deploy]') &&
+      !contains(github.event.head_commit.message, '[skip-deploy]') &&
+      !contains(github.event.head_commit.message, '[no deploy]') &&
+      !contains(github.event.head_commit.message, '[no-deploy]') &&
+      !contains(github.event.head_commit.message, '[skip cd]') &&
+      !contains(github.event.head_commit.message, '[skip-cd]')
     runs-on: ubuntu-latest
     steps:
       - name: Deploy Docker Compose Services
