@@ -14,24 +14,26 @@ for (let i = 0; i < 4; i++) {
   currentDir = parentDir;
 }
 
-// 2. Override with local development files in standard precedence order
-const overrideFiles = [
-  '.env.development',
-  '.env.local',
-  '.env.development.local',
-];
+// 2. Override with local development files in standard precedence order when not in production
+if (process.env.NODE_ENV !== 'production') {
+  const overrideFiles = [
+    '.env.development',
+    '.env.local',
+    '.env.development.local',
+  ];
 
-currentDir = process.cwd();
-for (let i = 0; i < 4; i++) {
-  for (const file of overrideFiles) {
-    const candidatePath = path.resolve(currentDir, file);
-    if (fs.existsSync(candidatePath)) {
-      dotenv.config({ path: candidatePath, override: true });
+  currentDir = process.cwd();
+  for (let i = 0; i < 4; i++) {
+    for (const file of overrideFiles) {
+      const candidatePath = path.resolve(currentDir, file);
+      if (fs.existsSync(candidatePath)) {
+        dotenv.config({ path: candidatePath, override: true });
+      }
     }
+    const parentDir = path.dirname(currentDir);
+    if (parentDir === currentDir) break;
+    currentDir = parentDir;
   }
-  const parentDir = path.dirname(currentDir);
-  if (parentDir === currentDir) break;
-  currentDir = parentDir;
 }
 
 export interface DbEnv {
