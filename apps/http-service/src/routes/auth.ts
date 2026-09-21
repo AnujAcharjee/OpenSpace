@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { authentication, oauthCallBack } from '../controllers/auth/authentication.js';
+import { getClearAuthCookieOptions } from '../utils/cookie.js';
 
 export const authRouter: Router = Router();
 
@@ -9,12 +10,12 @@ authRouter.get('/pramaan/callback', asyncHandler(oauthCallBack));
 
 authRouter.post('/logout', (req, res) => {
   const cookieName = process.env.ACCESS_TOKEN_COOKIE_NAME?.trim() || 'accessToken';
-  res.clearCookie(cookieName, { path: '/' });
+  res.clearCookie(cookieName, getClearAuthCookieOptions());
   res.status(200).json({ success: true, message: 'Logged out successfully' });
 });
 
 authRouter.get('/logout', (req, res) => {
   const cookieName = process.env.ACCESS_TOKEN_COOKIE_NAME?.trim() || 'accessToken';
-  res.clearCookie(cookieName, { path: '/' });
+  res.clearCookie(cookieName, getClearAuthCookieOptions());
   res.redirect(process.env.WEB_APP_URL || 'http://localhost:3000/auth');
 });

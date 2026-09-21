@@ -7,6 +7,7 @@ import { pramaan } from '../../lib/pramaan.js';
 import { redis } from '../../lib/redis.js';
 import { logger } from '../../lib/logger.js';
 import { toUserRecord } from '../@helpers.js';
+import { getAuthCookieOptions, getClearAuthCookieOptions } from '../../utils/cookie.js';
 
 const WEB_APP_URL = process.env.WEB_APP_URL ?? 'http://localhost:3000';
 const ACCESS_TOKEN_COOKIE_NAME = process.env.ACCESS_TOKEN_COOKIE_NAME?.trim() || 'accessToken';
@@ -178,13 +179,11 @@ export const authentication = async (req: Request, res: Response) => {
   logger.debug({ mode, state: authReq.transaction.state }, 'Initiating Pramaan authentication');
 
   // 2. Set temporary httpOnly cookie for JWT stateless flow
-  res.cookie(PRAMAAN_TX_COOKIE_NAME, JSON.stringify(txData), {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    maxAge: OAUTH_STATE_TTL_SECONDS * 1000,
-    path: '/',
-  });
+  res.cookie(
+    PRAMAAN_TX_COOKIE_NAME,
+    JSON.stringify(txData),
+    getAuthCookieOptions(OAUTH_STATE_TTL_SECONDS),
+  );
 
   // 3. Also store in Redis for resilience
   await redis.set(
@@ -215,7 +214,7 @@ export const oauthCallBack = async (req: Request, res: Response) => {
   const mode = oauthState?.mode ?? fallbackMode;
 
   // Clear temporary transaction states
-  res.clearCookie(PRAMAAN_TX_COOKIE_NAME, { path: '/' });
+  res.clearCookie(PRAMAAN_TX_COOKIE_NAME, getClearAuthCookieOptions());
   await redis.del(getStateRedisKey(state));
 
   if (providerError) {
@@ -272,14 +271,12 @@ export const oauthCallBack = async (req: Request, res: Response) => {
     // 7. Issue application JWT access token
     const accessToken = await auth.issueAccessToken(user);
 
-    // 8. Set application JWT in secure httpOnly cookie
-    res.cookie(ACCESS_TOKEN_COOKIE_NAME, accessToken, {
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: process.env.NODE_ENV === 'production',
-      maxAge: ACCESS_TOKEN_TTL_SECONDS * 1000,
-      path: '/',
-    });
+    // 8. Set application JWT in secure httpOnly cookie (shared with web app domain)
+    res.cookie(
+      ACCESS_TOKEN_COOKIE_NAME,
+      accessToken,
+      getAuthCookieOptions(ACCESS_TOKEN_TTL_SECONDS),
+    );
 
     logger.info({ userId: user.id }, 'User successfully authenticated via Pramaan SDK');
     return res.redirect(`${WEB_APP_URL}`);
