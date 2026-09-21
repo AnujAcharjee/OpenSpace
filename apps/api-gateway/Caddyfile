@@ -1,3 +1,0 @@
-api.localhost {
-  reverse_proxy host.docker.internal:3005
-}
