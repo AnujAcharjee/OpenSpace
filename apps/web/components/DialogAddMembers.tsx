@@ -118,7 +118,7 @@ export function DialogAddMembers({
       toast.success(
         addedCount > 0
           ? `${addedCount} member(s) added to #${room.name}`
-          : "Members already in room",
+          : "Members already in channel",
         toastOptions
       )
     } catch (error) {

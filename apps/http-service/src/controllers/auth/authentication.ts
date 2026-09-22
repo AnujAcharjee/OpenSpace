@@ -68,6 +68,8 @@ async function fetchUserByEmail(email: string) {
   return user ? toUserRecord(user) : null;
 }
 
+import { enrollUserInDefaultRooms } from '../../lib/defaultRooms.js';
+
 async function createUserProfile(input: {
   email: string;
   username: string;
@@ -84,6 +86,9 @@ async function createUserProfile(input: {
       updatedAt: new Date(),
     },
   });
+
+  // Automatically enroll new user in default rooms: World Chat, Football, AI Chat
+  await enrollUserInDefaultRooms(user.id);
 
   return toUserRecord(user);
 }
@@ -126,7 +131,7 @@ async function ensureUserFromProfile(payload: ProviderProfile) {
 }
 
 function buildWebAuthUrl(mode: AuthMode, error?: string) {
-  const url = new URL('/auth', WEB_APP_URL);
+  const url = new URL('/signin', WEB_APP_URL);
   url.searchParams.set('mode', mode);
   if (error) url.searchParams.set('error', error);
   return url.toString();

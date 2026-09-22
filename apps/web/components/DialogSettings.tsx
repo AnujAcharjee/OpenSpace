@@ -259,7 +259,7 @@ export function DialogSettings() {
               <div className="flex flex-col gap-2">
                 <span className="text-sm font-semibold text-foreground">Select Theme</span>
                 <span className="text-xs text-muted-foreground">
-                  Customize Collab's aesthetic to your taste.
+                  Customize OpenSpace's aesthetic to your taste.
                 </span>
                 <div className="flex gap-2 mt-2">
                   {(["light", "dark", "system"] as const).map((t) => (

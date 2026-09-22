@@ -66,7 +66,7 @@ export const handlers: Record<string, (payload: unknown) => void> = {
         setActiveRoom(null)
       }
 
-      toast.info(`Room ${data.roomName ? `"${data.roomName}" ` : ""}has been deleted`, {
+      toast.info(`Channel ${data.roomName ? `"${data.roomName}" ` : ""}has been deleted`, {
         position: "top-center",
       })
     } catch {}
@@ -86,7 +86,7 @@ export const handlers: Record<string, (payload: unknown) => void> = {
         setActiveRoom(null)
       }
 
-      toast.error("You have been removed from the room and can no longer send messages.", {
+      toast.error("You have been removed from the channel and can no longer send messages.", {
         position: "top-center",
       })
     } catch {}

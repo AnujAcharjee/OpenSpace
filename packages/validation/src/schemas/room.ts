@@ -152,6 +152,17 @@ export const removeRoomMemberSchema = z.object({
 
 export type RemoveRoomMemberRequest = z.infer<typeof removeRoomMemberSchema>;
 
+export const leaveRoomSchema = z.object({
+  params: z.object({
+    id: uuidSchema('id must be a valid UUID'),
+  }),
+  body: z.object({
+    userId: uuidSchema('userId must be a valid UUID').optional(),
+  }).optional(),
+});
+
+export type LeaveRoomRequest = z.infer<typeof leaveRoomSchema>;
+
 export const roomMemberRoleSchema = z.enum(['MEMBER', 'ADMIN', 'OWNER']);
 
 export const roomJoinRequestStatusSchema = z.enum(['PENDING']);

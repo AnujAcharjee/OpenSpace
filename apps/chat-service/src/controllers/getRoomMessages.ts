@@ -28,6 +28,8 @@ export const getRoomMessages = async (req: Request, res: Response) => {
       });
     }
 
+    const takeLimit = limit ? Math.min(Math.max(Number(limit), 1), 100) : 100;
+
     const messages = await prisma.chatMessage.findMany({
       where: {
         roomId,
@@ -42,10 +44,13 @@ export const getRoomMessages = async (req: Request, res: Response) => {
         },
       },
       orderBy: {
-        createdAt: 'asc',
+        createdAt: 'desc',
       },
-      take: limit ? Number(limit) : 100,
+      take: takeLimit,
     });
+
+    // Sort ascending for chronological display
+    messages.reverse();
 
     return res.status(200).json({
       success: true,

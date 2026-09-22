@@ -36,7 +36,16 @@ import {
   IconPhoto,
   IconAlertCircle,
   IconCopy,
+  IconLogout,
+  IconBolt,
+  IconShieldCheck,
+  IconHash,
+  IconSearch,
+  IconPlus,
+  IconVideo,
+  IconMessageCircle,
 } from "@tabler/icons-react"
+import { wsClient } from "@/ws"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   ContextMenu,
@@ -176,10 +185,10 @@ export default function ChatSection({ room }: { room: RoomRecord | null }) {
 
               <div className="space-y-2">
                 <h2 className="text-2xl font-bold tracking-tight text-foreground">
-                  Welcome to Collab
+                  Welcome to OpenSpace
                 </h2>
                 <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
-                  Real-time collaborative workspaces, channels, and direct messaging powered by secure Pramaan identity.
+                  Discover conversations, join public communities, and connect through real-time text, voice, and video.
                 </p>
               </div>
 
@@ -187,23 +196,32 @@ export default function ChatSection({ room }: { room: RoomRecord | null }) {
                 <Button
                   size="lg"
                   className="w-full sm:w-auto h-11 px-8 rounded-xl font-semibold shadow-[0_0_20px_rgba(244,187,68,0.25)] hover:shadow-[0_0_25px_rgba(244,187,68,0.45)] cursor-pointer"
-                  onClick={() => router.push("/auth")}
+                  onClick={() => router.push("/signin")}
                 >
-                  Sign In / Sign Up
+                  Sign in
                 </Button>
               </div>
 
               <div className="grid grid-cols-3 gap-3 w-full pt-4 border-t border-border/40 text-center">
-                <div className="space-y-1">
-                  <div className="text-xs font-semibold text-foreground">⚡ Real-time</div>
+                <div className="flex flex-col items-center space-y-1">
+                  <div className="flex items-center gap-1 text-xs font-semibold text-foreground">
+                    <IconBolt size={14} className="text-[#d4af37]" />
+                    <span>Real-time</span>
+                  </div>
                   <div className="text-[10px] text-muted-foreground">Instant messaging</div>
                 </div>
-                <div className="space-y-1">
-                  <div className="text-xs font-semibold text-foreground">🔒 Protected</div>
+                <div className="flex flex-col items-center space-y-1">
+                  <div className="flex items-center gap-1 text-xs font-semibold text-foreground">
+                    <IconShieldCheck size={14} className="text-[#d4af37]" />
+                    <span>Protected</span>
+                  </div>
                   <div className="text-[10px] text-muted-foreground">Pramaan Auth</div>
                 </div>
-                <div className="space-y-1">
-                  <div className="text-xs font-semibold text-foreground">🌐 Channels</div>
+                <div className="flex flex-col items-center space-y-1">
+                  <div className="flex items-center gap-1 text-xs font-semibold text-foreground">
+                    <IconHash size={14} className="text-[#d4af37]" />
+                    <span>Channels</span>
+                  </div>
                   <div className="text-[10px] text-muted-foreground">Public & Private</div>
                 </div>
               </div>
@@ -223,12 +241,46 @@ export default function ChatSection({ room }: { room: RoomRecord | null }) {
             </div>
 
             <div className="space-y-1">
-              <h2 className="text-lg font-bold tracking-tight text-foreground">
-                Welcome back{user?.name ? `, ${user.name}` : user?.username ? `, ${user.username}` : ""}!
+              <h2 className="text-xl font-bold tracking-tight text-foreground">
+                Welcome to OpenSpace{user?.name ? `, ${user.name}` : user?.username ? `, ${user.username}` : ""}!
               </h2>
               <p className="text-xs text-muted-foreground leading-relaxed">
-                Select a channel from the sidebar or search to start collaborating.
+                Select a channel from the sidebar or search above to start collaborating.
               </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2.5 w-full pt-4 border-t border-border/40 text-left">
+              <div className="flex items-start gap-2.5 rounded-xl border border-border/50 bg-muted/40 p-2.5">
+                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary border border-primary/20">
+                  <IconSearch size={14} />
+                </div>
+                <div>
+                  <div className="text-xs font-semibold text-foreground">Discover Channels</div>
+                  <div className="text-[10px] text-muted-foreground">Search and join conversations</div>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-2.5 rounded-xl border border-border/50 bg-muted/40 p-2.5">
+                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary border border-primary/20">
+                  <IconPlus size={14} />
+                </div>
+                <div>
+                  <div className="text-xs font-semibold text-foreground">Create Channel</div>
+                  <div className="text-[10px] text-muted-foreground">Start your own community</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-center gap-4 pt-1 text-[11px] text-muted-foreground">
+              <span className="flex items-center gap-1">
+                <IconMessageCircle size={13} className="text-[#d4af37]" /> Text Chat
+              </span>
+              <span className="flex items-center gap-1">
+                <IconMicrophone size={13} className="text-[#d4af37]" /> Voice Rooms
+              </span>
+              <span className="flex items-center gap-1">
+                <IconVideo size={13} className="text-[#d4af37]" /> Video Calls
+              </span>
             </div>
           </div>
         </Card>
@@ -238,8 +290,8 @@ export default function ChatSection({ room }: { room: RoomRecord | null }) {
 
   return (
     <div className="h-full w-full p-1.5">
-      <Card className="flex h-full w-full flex-col gap-0 border border-border/40 bg-card/50 shadow-[0_8px_30px_rgb(0,0,0,0.03)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] backdrop-blur-md rounded-2xl p-0 overflow-hidden">
-        <CardHeader className="shrink-0 flex items-center gap-2 border-b border-border/50 bg-card/40 px-3 py-3 backdrop-blur-sm">
+      <Card className="flex h-full w-full flex-col gap-0 border border-border/70 dark:border-border/40 bg-white/95 dark:bg-card/50 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] backdrop-blur-md rounded-2xl p-0 overflow-hidden">
+        <CardHeader className="shrink-0 flex items-center gap-2 border-b border-border/60 dark:border-border/50 bg-white/80 dark:bg-card/40 px-3 py-3 backdrop-blur-sm">
           <button
             type="button"
             onClick={() => setActiveRoom(null)}
@@ -258,7 +310,7 @@ export default function ChatSection({ room }: { room: RoomRecord | null }) {
             type="button"
             onClick={toggleMembersPanel}
             className="rounded-lg transition hover:bg-muted/60 cursor-pointer"
-            aria-label="View room members"
+            aria-label="View channel members"
           >
             <Avatar className="h-8 w-8 shrink-0 border border-border">
               <AvatarImage src={room.avatarUrl ?? undefined} alt={room.name} />
@@ -272,7 +324,7 @@ export default function ChatSection({ room }: { room: RoomRecord | null }) {
             type="button"
             onClick={toggleMembersPanel}
             className="min-w-0 flex-1 rounded-lg px-1 py-0.5 text-left transition hover:bg-muted/60 cursor-pointer"
-            aria-label="View room members"
+            aria-label="View channel members"
           >
             <div className="text-md truncate tracking-wide text-foreground">
               {room.name}
@@ -302,7 +354,7 @@ export default function ChatSection({ room }: { room: RoomRecord | null }) {
             </Button>
           )}
 
-          {canManageRoom && <DialogEditRoom room={room} />}
+          {canManageRoom && <DialogEditRoom key={room.id} room={room} />}
         </CardHeader>
 
         <CardContent className="min-h-0 flex-1 overflow-hidden px-0 py-0 sm:px-1">
@@ -343,8 +395,12 @@ export default function ChatSection({ room }: { room: RoomRecord | null }) {
                     </div>
                   )}
                   {!isLoading && roomMessages.length === 0 && (
-                    <div className="text-center text-sm text-muted-foreground py-8">
-                      No messages yet. Start the conversation.
+                    <div className="flex flex-col items-center justify-center py-12 text-center select-none space-y-2">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-muted/60 border border-border/40 text-muted-foreground mb-1">
+                        <IconMessageReply size={22} className="opacity-70" />
+                      </div>
+                      <div className="text-sm font-semibold text-foreground">No messages yet</div>
+                      <div className="text-xs text-muted-foreground max-w-xs">Be the first to start the conversation.</div>
                     </div>
                   )}
                 {roomMessages.map((message) => {
@@ -414,16 +470,16 @@ export default function ChatSection({ room }: { room: RoomRecord | null }) {
       </CardContent>
 
         {!showMembersPanel && (
-          <CardFooter className="shrink-0 flex gap-2 px-3 py-3 border-t border-border/40 bg-card/40 backdrop-blur-sm">
+          <CardFooter className="shrink-0 flex gap-2 px-3 py-3 border-t border-border/60 dark:border-border/40 bg-white/80 dark:bg-card/40 backdrop-blur-sm">
             {!user ? (
               <div className="flex w-full items-center justify-between gap-3 rounded-xl border border-border/50 bg-muted/40 px-4 py-2.5">
                 <span className="text-xs text-muted-foreground">
-                  Sign in to participate and send messages in {room.name}
+                  Access unavailable. You need to sign in to use chat.
                 </span>
                 <Button
                   size="sm"
                   className="h-8 shrink-0 rounded-lg px-3 text-xs font-semibold cursor-pointer"
-                  onClick={() => router.push("/auth")}
+                  onClick={() => router.push("/signin")}
                 >
                   Sign In
                 </Button>
@@ -431,7 +487,7 @@ export default function ChatSection({ room }: { room: RoomRecord | null }) {
             ) : user && !room.members.some((m) => m.userId === user.id) ? (
               <div className="flex w-full max-w-xl mx-auto items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-xs font-medium text-amber-600 dark:text-amber-400">
                 <IconAlertCircle size={16} className="shrink-0" />
-                <span>You have been removed from this room. You can no longer send messages.</span>
+                <span>You have been removed from this channel. You can no longer send messages.</span>
               </div>
             ) : (
               <form
@@ -488,7 +544,7 @@ export default function ChatSection({ room }: { room: RoomRecord | null }) {
                         !user
                           ? "Sign in to send messages"
                           : !room.members.some((m) => m.userId === user.id)
-                            ? "You cannot send messages to this room"
+                            ? "You cannot send messages to this channel"
                             : replyingTo
                               ? `Reply to @${getAuthorName(replyingTo)}...`
                               : `Message ${room.name}`
@@ -697,10 +753,10 @@ function MessageBubble({
 
             {/* Bubble Box */}
             <div
-              className={`min-w-0 rounded-2xl px-3.5 py-2 text-xs leading-relaxed sm:text-sm text-foreground bg-muted/80 backdrop-blur-sm transition-all duration-150 ${
+              className={`min-w-0 rounded-2xl px-3.5 py-2 text-xs leading-relaxed sm:text-sm text-foreground backdrop-blur-sm transition-all duration-150 ${
                 isOwn
-                  ? "rounded-br-xs border border-[#d4af37] dark:border-[#f5d061] shadow-[0_2px_12px_rgba(244,187,68,0.12)]"
-                  : "rounded-bl-xs border border-blue-500/70 dark:border-blue-400/70 shadow-[0_2px_12px_rgba(59,130,246,0.1)]"
+                  ? "rounded-br-xs border border-[#d4af37] dark:border-[#f5d061] bg-amber-500/10 dark:bg-muted/80 shadow-[0_2px_12px_rgba(244,187,68,0.14)]"
+                  : "rounded-bl-xs border border-blue-500/50 dark:border-blue-400/70 bg-blue-500/8 dark:bg-muted/80 shadow-[0_2px_12px_rgba(59,130,246,0.08)]"
               }`}
             >
               {/* Sender Name for other users inside the bubble (WhatsApp group chat style) */}
@@ -718,7 +774,7 @@ function MessageBubble({
                     onJumpToParent?.()
                   }}
                   title="Jump to original message"
-                  className={`group/reply mb-2 min-w-0 rounded-xl border-l-[3px] bg-background/50 hover:bg-background/80 dark:bg-background/40 dark:hover:bg-background/70 px-2.5 py-1.5 text-[11px] sm:text-xs transition-all duration-150 cursor-pointer shadow-2xs select-none active:scale-[0.99] ${
+                  className={`group/reply mb-2 min-w-0 rounded-xl border-l-[3px] bg-white/70 hover:bg-white/90 dark:bg-background/40 dark:hover:bg-background/70 px-2.5 py-1.5 text-[11px] sm:text-xs transition-all duration-150 cursor-pointer shadow-2xs select-none active:scale-[0.99] ${
                     isOwn
                       ? "border-[#d4af37] text-foreground"
                       : "border-blue-500 text-foreground"
@@ -794,6 +850,13 @@ function DialogEditRoom({ room }: { room: RoomRecord }) {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(room.avatarUrl ?? null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  useEffect(() => {
+    setAvatarUrl(room.avatarUrl ?? null)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ""
+    }
+  }, [room.id, room.avatarUrl, open])
+
   const defaultValues: EditRoomFormInput = {
     name: room.name,
     description: room.description ?? "",
@@ -803,19 +866,19 @@ function DialogEditRoom({ room }: { room: RoomRecord }) {
   const roomFields: FieldConfig<EditRoomFormInput>[] = [
     {
       name: "name",
-      label: "Room Name",
-      placeholder: "room-name",
+      label: "Channel Name",
+      placeholder: "channel-name",
       autoComplete: "off",
     },
     {
       name: "description",
       label: "Description",
-      placeholder: "What this room is for",
+      placeholder: "What this channel is for",
       autoComplete: "off",
     },
     {
       name: "isPrivate",
-      label: "Room Visibility",
+      label: "Channel Visibility",
       fieldType: "radio",
       options: [
         { label: "Public", value: "false" },
@@ -852,13 +915,13 @@ function DialogEditRoom({ room }: { room: RoomRecord }) {
 
       useAppStore.getState().upsertRoom(updatedRoom)
       setOpen(false)
-      toast.success("Room updated", toastOptions)
+      toast.success("Channel updated", toastOptions)
     } catch (error) {
       const message = axios.isAxiosError(error)
         ? (error.response?.data?.error ??
           error.response?.data?.message ??
-          "Unable to update room")
-        : "Unable to update room"
+          "Unable to update channel")
+        : "Unable to update channel"
 
       toast.error(message, toastOptions)
     }
@@ -885,13 +948,13 @@ function DialogEditRoom({ room }: { room: RoomRecord }) {
       clearMessages(room.id)
       removeRoom(room.id)
       setConfirmDeleteOpen(false)
-      toast.success("Room deleted", toastOptions)
+      toast.success("Channel deleted", toastOptions)
     } catch (error) {
       const message = axios.isAxiosError(error)
         ? (error.response?.data?.error ??
           error.response?.data?.message ??
-          "Unable to delete room")
-        : "Unable to delete room"
+          "Unable to delete channel")
+        : "Unable to delete channel"
 
       toast.error(message, toastOptions)
     } finally {
@@ -901,12 +964,21 @@ function DialogEditRoom({ room }: { room: RoomRecord }) {
 
   return (
     <>
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog
+        open={open}
+        onOpenChange={(val) => {
+          setOpen(val)
+          setAvatarUrl(room.avatarUrl ?? null)
+          if (fileInputRef.current) {
+            fileInputRef.current.value = ""
+          }
+        }}
+      >
         <DialogTrigger asChild>
           <button
             type="button"
             className="flex items-center justify-center rounded-lg p-1.5 text-muted-foreground transition-all duration-150 hover:bg-muted hover:text-foreground active:scale-95"
-            aria-label="Edit room"
+            aria-label="Edit channel"
           >
             <IconDotsVertical size={18} stroke={2} />
           </button>
@@ -914,9 +986,9 @@ function DialogEditRoom({ room }: { room: RoomRecord }) {
 
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Edit Room</DialogTitle>
+            <DialogTitle>Edit Channel</DialogTitle>
             <DialogDescription>
-              Update the room name, description, avatar, or visibility.
+              Update the channel name, description, avatar, or visibility.
             </DialogDescription>
           </DialogHeader>
 
@@ -943,7 +1015,7 @@ function DialogEditRoom({ room }: { room: RoomRecord }) {
                   className="h-7 text-xs rounded-lg cursor-pointer"
                   onClick={() => fileInputRef.current?.click()}
                 >
-                  Change Room Icon
+                  Change Channel Icon
                 </Button>
                 {avatarUrl && (
                   <Button
@@ -951,7 +1023,12 @@ function DialogEditRoom({ room }: { room: RoomRecord }) {
                     variant="ghost"
                     size="sm"
                     className="h-7 px-2 text-xs text-destructive hover:text-destructive cursor-pointer"
-                    onClick={() => setAvatarUrl(null)}
+                    onClick={() => {
+                      setAvatarUrl(null)
+                      if (fileInputRef.current) {
+                        fileInputRef.current.value = ""
+                      }
+                    }}
                   >
                     <IconTrash size={14} className="mr-1" /> Remove
                   </Button>
@@ -960,13 +1037,17 @@ function DialogEditRoom({ room }: { room: RoomRecord }) {
             </div>
 
             <AppForm
-              key={`${room.id}-${room.updatedAt}`}
+              key={`${room.id}-${room.updatedAt}-${open}`}
               formId={`edit-room-form-${room.id}`}
               schema={editRoomFormSchema}
-              defaultValues={defaultValues}
+              defaultValues={{
+                name: room.name,
+                description: room.description ?? "",
+                isPrivate: room.isPrivate ? ("true" as const) : ("false" as const),
+              }}
               fields={roomFields}
               onSubmit={async (data) => {
-                await handleUpdateRoom(data)
+                await handleUpdateRoom(data as EditRoomFormInput)
               }}
               submitLabel="Save changes"
               pendingLabel="Saving changes..."
@@ -978,7 +1059,7 @@ function DialogEditRoom({ room }: { room: RoomRecord }) {
               className="w-full"
               onClick={handleOpenDeleteConfirmation}
             >
-              Delete room
+              Delete channel
             </Button>
           </div>
         </DialogContent>
@@ -987,7 +1068,7 @@ function DialogEditRoom({ room }: { room: RoomRecord }) {
       <Dialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Delete Room?</DialogTitle>
+            <DialogTitle>Delete Channel?</DialogTitle>
             <DialogDescription>
               This will permanently delete {room.name} and its messages. This
               action cannot be undone.
@@ -1031,11 +1112,16 @@ function RoomMembersPanel({
   canManageRoom: boolean
   onShowChat: () => void
 }) {
+  const isMember = currentUserId
+    ? room.members.some((member) => member.userId === currentUserId)
+    : false
+
   const {
     addMembers: addMembersRequest,
     removeMember: removeMemberRequest,
     getPendingJoinRequests: getPendingJoinRequestsRequest,
     respondJoinRequest: respondJoinRequestRequest,
+    leaveRoom: leaveRoomRequest,
   } = useRooms()
 
   const pendingRequests = useAppStore(
@@ -1048,6 +1134,8 @@ function RoomMembersPanel({
   const [removeTarget, setRemoveTarget] = useState<RoomMemberRecord | null>(
     null
   )
+  const [confirmLeaveOpen, setConfirmLeaveOpen] = useState(false)
+  const [isLeaving, setIsLeaving] = useState(false)
   const [isLoadingPending, setIsLoadingPending] = useState(false)
   const [processingRequestId, setProcessingRequestId] = useState<string | null>(
     null
@@ -1350,6 +1438,21 @@ function RoomMembersPanel({
                 </div>
               )
             })}
+
+            {isMember && (
+              <div className="pt-3 pb-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="w-full text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/30"
+                  onClick={() => setConfirmLeaveOpen(true)}
+                >
+                  <IconLogout size={14} className="mr-2" />
+                  Leave Channel
+                </Button>
+              </div>
+            )}
           </div>
         </ScrollArea>
       </div>
@@ -1359,6 +1462,67 @@ function RoomMembersPanel({
         open={addMembersOpen}
         onOpenChange={setAddMembersOpen}
       />
+
+      <Dialog
+        open={confirmLeaveOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setConfirmLeaveOpen(false)
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Leave Channel?</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to leave {room.name}? You will need to rejoin to access messages if it is private.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="flex-1"
+              onClick={() => setConfirmLeaveOpen(false)}
+              disabled={isLeaving}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              className="flex-1"
+              onClick={async () => {
+                if (isLeaving) return
+                setIsLeaving(true)
+                try {
+                  await leaveRoomRequest(room.id, currentUserId ?? undefined)
+                  wsClient.leaveRoom(room.id)
+                  useAppStore.getState().clearMessages(room.id)
+                  useAppStore.getState().removeRoom(room.id)
+                  useAppStore.getState().setActiveRoom(null)
+                  setConfirmLeaveOpen(false)
+                  onShowChat()
+                  toast.success(`Left ${room.name}`, toastOptions)
+                } catch (error) {
+                  const message = axios.isAxiosError(error)
+                    ? (error.response?.data?.error ??
+                      error.response?.data?.message ??
+                      "Unable to leave channel")
+                    : "Unable to leave channel"
+                  toast.error(message, toastOptions)
+                } finally {
+                  setIsLeaving(false)
+                }
+              }}
+              disabled={isLeaving}
+            >
+              {isLeaving ? "Leaving..." : "Confirm leave"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={Boolean(removeTarget)}
@@ -1373,7 +1537,7 @@ function RoomMembersPanel({
             <DialogTitle>Remove member?</DialogTitle>
             <DialogDescription>
               Remove {removeTarget?.user?.username ?? "this member"} from this
-              room?
+              channel?
             </DialogDescription>
           </DialogHeader>
 

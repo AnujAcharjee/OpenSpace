@@ -5,6 +5,8 @@ import { prisma, Prisma } from '@repo/db';
 import { toUserRecord } from '../@helpers.js';
 import { AppError } from '../../utils/appError.js';
 
+import { enrollUserInDefaultRooms } from '../../lib/defaultRooms.js';
+
 export const createUser = async (req: Request, res: Response) => {
   const data = req.body as CreateUserInput;
 
@@ -20,6 +22,8 @@ export const createUser = async (req: Request, res: Response) => {
         updatedAt: new Date(),
       },
     });
+
+    await enrollUserInDefaultRooms(user.id);
 
     return res.status(201).json({
       success: true,

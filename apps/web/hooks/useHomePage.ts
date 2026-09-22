@@ -21,8 +21,8 @@ export function useHomePage() {
 
   const storeRooms = useAppStore((s) => s.rooms)
   const activeRoom =
-    rooms.find((r) => r.id === activeRoomId) ??
     storeRooms.find((r) => r.id === activeRoomId) ??
+    rooms.find((r) => r.id === activeRoomId) ??
     null
 
   return {

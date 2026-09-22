@@ -11,6 +11,7 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable"
+import { ChatOnboarding } from "@/components/ChatOnboarding"
 
 export default function HomeLayout() {
   const { hasHydrated, fetch, user, isCurrentUser, activeRoom } = useHomePage()
@@ -36,7 +37,7 @@ export default function HomeLayout() {
   const showChat = isLg || !!activeRoom
 
   return (
-    <div className="relative flex h-svh w-full overflow-hidden bg-[radial-gradient(circle_at_top_right,rgba(244,187,68,0.05),transparent_40%),radial-gradient(circle_at_bottom_left,rgba(120,80,200,0.04),transparent_40%),linear-gradient(135deg,#FAF7F2_0%,#FDFBF7_50%,#F5EFE4_100%)] dark:bg-[radial-gradient(circle_at_top_right,rgba(244,187,68,0.03),transparent_45%),radial-gradient(circle_at_bottom_left,rgba(120,80,200,0.03),transparent_45%),linear-gradient(135deg,#0E0E11_0%,#09090B_60%,#0D0D10_100%)] p-2 md:p-3">
+    <div className="relative flex h-svh w-full overflow-hidden bg-[radial-gradient(circle_at_top_right,rgba(212,175,55,0.08),transparent_50%),radial-gradient(circle_at_bottom_left,rgba(59,130,246,0.03),transparent_45%),linear-gradient(135deg,#FAF9F6_0%,#F6F5F2_50%,#F0EFEA_100%)] dark:bg-[radial-gradient(circle_at_top_right,rgba(244,187,68,0.03),transparent_45%),radial-gradient(circle_at_bottom_left,rgba(120,80,200,0.03),transparent_45%),linear-gradient(135deg,#0E0E11_0%,#09090B_60%,#0D0D10_100%)] p-2 md:p-3">
       <ResizablePanelGroup className="h-full w-full">
         {showSidebar && (
           <>
@@ -67,6 +68,7 @@ export default function HomeLayout() {
           </ResizablePanel>
         )}
       </ResizablePanelGroup>
+      <ChatOnboarding user={isCurrentUser ? user : null} />
     </div>
   )
 }

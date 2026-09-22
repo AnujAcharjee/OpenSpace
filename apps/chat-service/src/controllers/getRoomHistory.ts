@@ -38,10 +38,12 @@ export const getRoomHistory = async (req: Request, res: Response) => {
       },
     },
     orderBy: {
-      createdAt: 'asc',
+      createdAt: 'desc',
     },
-    take: 80,
+    take: 100,
   });
+
+  messages.reverse();
 
   return res.status(200).json({
     success: true,

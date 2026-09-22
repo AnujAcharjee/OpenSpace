@@ -5,6 +5,7 @@ const { mockRedis, mockPrisma } = vi.hoisted(() => ({
   mockRedis: {
     sadd: vi.fn(),
     srem: vi.fn(),
+    publish: vi.fn().mockResolvedValue(1),
     expire: vi.fn().mockResolvedValue(1),
     del: vi.fn(),
     get: vi.fn(),
@@ -22,6 +23,7 @@ const { mockRedis, mockPrisma } = vi.hoisted(() => ({
       findUnique: vi.fn(),
       create: vi.fn(),
       findMany: vi.fn(),
+      delete: vi.fn(),
     },
     chatRoomJoinRequest: {
       findUnique: vi.fn(),
@@ -88,6 +90,7 @@ vi.mock('../../utils/logger.js', () => ({
 import { searchRooms } from '../controllers/room/searchRooms.js';
 import { requestJoinRoomController } from '../controllers/room/requestJoinRoom.js';
 import { createRoom } from '../controllers/room/createRoom.js';
+import { leaveRoom } from '../controllers/room/leaveRoom.js';
 
 describe('HTTP Service - Room Search & Join', () => {
   beforeEach(() => {
@@ -344,6 +347,65 @@ describe('HTTP Service - Room Search & Join', () => {
             room: expect.objectContaining({
               name: 'Unique Room',
             }),
+          }),
+        }),
+      );
+    });
+  });
+
+  describe('leaveRoom Controller', () => {
+    it('should allow a member to leave room, remove member from db and redis, and publish WS notification', async () => {
+      const roomId = 'a0000000-0000-0000-0000-000000000001';
+      const userId = 'a0000000-0000-0000-0000-000000000002';
+      const creatorId = 'a0000000-0000-0000-0000-000000000003';
+
+      mockPrisma.chatRoom.findUnique
+        .mockResolvedValueOnce({
+          id: roomId,
+          name: 'General',
+          isPrivate: false,
+          creator: { id: creatorId, username: 'admin' },
+          members: [
+            { id: 'm-1', userId: creatorId, user: { username: 'admin' } },
+            { id: 'm-2', userId, user: { username: 'alice' } },
+          ],
+        })
+        .mockResolvedValueOnce({
+          id: roomId,
+          name: 'General',
+          isPrivate: false,
+          creator: { id: creatorId, username: 'admin' },
+          members: [{ id: 'm-1', userId: creatorId, user: { username: 'admin' } }],
+        });
+
+      mockPrisma.chatRoomMember.delete.mockResolvedValueOnce({
+        id: 'm-2',
+        roomId,
+        userId,
+      });
+
+      const req = {
+        params: { id: roomId },
+        user: { id: userId },
+      } as unknown as Request;
+
+      const res = createMockRes();
+
+      await leaveRoom(req, res);
+
+      expect(mockPrisma.chatRoomMember.delete).toHaveBeenCalledWith({
+        where: { id: 'm-2' },
+      });
+      expect(mockRedis.srem).toHaveBeenCalledWith(`room:${roomId}:members`, userId);
+      expect(mockRedis.publish).toHaveBeenCalledTimes(3);
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: true,
+          message: 'Successfully left the room',
+          data: expect.objectContaining({
+            roomId,
+            userId,
           }),
         }),
       );

@@ -6,6 +6,7 @@ import {
   editRoomSchema,
   getPendingJoinRequestsSchema,
   getRoomSchema,
+  leaveRoomSchema,
   removeRoomMemberSchema,
   requestJoinRoomSchema,
   respondJoinRequestSchema,
@@ -16,6 +17,7 @@ import { createRoom } from '../controllers/room/createRoom.js';
 import { deleteRoom } from '../controllers/room/deleteRoom.js';
 import { editRoom } from '../controllers/room/editRoom.js';
 import { getRoom } from '../controllers/room/getRoom.js';
+import { leaveRoom } from '../controllers/room/leaveRoom.js';
 import { removeRoomMember } from '../controllers/room/removeRoomMember.js';
 import { requestJoinRoomController } from '../controllers/room/requestJoinRoom.js';
 import { getPendingJoinRequestsController } from '../controllers/room/getPendingJoinRequests.js';
@@ -29,6 +31,7 @@ export const roomRouter: Router = Router();
 roomRouter.post('/', validateRequest(createRoomSchema), asyncHandler(createRoom));
 roomRouter.get('/search', validateRequest(searchRoomsSchema), asyncHandler(searchRooms));
 roomRouter.post('/:id/join', validateRequest(requestJoinRoomSchema), asyncHandler(requestJoinRoomController));
+roomRouter.post('/:id/leave', validateRequest(leaveRoomSchema), asyncHandler(leaveRoom));
 roomRouter.get(
   '/:id/join-requests',
   validateRequest(getPendingJoinRequestsSchema),

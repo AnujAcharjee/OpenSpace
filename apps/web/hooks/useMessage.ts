@@ -53,19 +53,22 @@ type DeleteMessageResponse = {
 }
 
 export const useMessage = () => {
-  const fetchMessages = useCallback(async (roomId: string, userId: string) => {
-    const res = await axios.get<ChatHistoryResponse>(
-      `${chatApiUrl}/rooms/${roomId}/messages`,
-      {
-        params:{
-          limit: 50,
-        },
-        withCredentials: true,
-      }
-    )
+  const fetchMessages = useCallback(
+    async (roomId: string, userId: string, limit: number = 100) => {
+      const res = await axios.get<ChatHistoryResponse>(
+        `${chatApiUrl}/rooms/${roomId}/messages`,
+        {
+          params: {
+            limit,
+          },
+          withCredentials: true,
+        }
+      )
 
-    return res.data.data?.messages ?? []
-  }, [])
+      return res.data.data?.messages ?? []
+    },
+    []
+  )
 
   const createMessage = useCallback(
     async (payload: CreateMessageInput["body"]) => {

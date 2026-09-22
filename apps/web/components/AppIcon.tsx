@@ -21,7 +21,7 @@ export function AppIcon({ size = "md" }: { size?: "sm" | "md" | "lg" }) {
       <span
         className={`relative font-sans ${word[size]} leading-none font-bold tracking-widest text-[#b8860b] dark:text-[#f5d061] drop-shadow-[0_0_6px_rgba(212,175,55,0.15)]`}
       >
-        Collab
+        OpenSpace
       </span>
     </div>
   )

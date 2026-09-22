@@ -15,16 +15,17 @@ const fontMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://collab.anujacharjee.com"),
-  title: "Collab",
+  metadataBase: new URL("https://openspace.anujacharjee.com"),
+  title: "OpenSpace — Discover Conversations & Communities",
   description:
-    "A real-time collaboration platform that breaks language barriers — talk to anyone, in any language, anywhere in the world.",
+    "Discover public channels, join conversations around the topics you care about, and connect with people from around the world — through text, voice, and video.",
 
   // Open Graph — controls how link looks
   openGraph: {
-    title: "Collab",
-    description: "A modern collab application",
-    url: "https://collab.anujacharjee.com",
+    title: "OpenSpace — Discover Conversations & Communities",
+    description:
+      "Discover public channels, join conversations around the topics you care about, and connect with people from around the world — through text, voice, and video.",
+    url: "https://openspace.anujacharjee.com",
     images: ["/og-image.png"],
   },
 

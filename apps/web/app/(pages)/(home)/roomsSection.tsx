@@ -17,11 +17,11 @@ import {
   Avatar,
   AvatarFallback,
   AvatarImage,
-  AvatarBadge,
 } from "@/components/ui/avatar"
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -202,8 +202,8 @@ export default function RoomsSection() {
 
   async function handleJoinRoom(room: RoomRecord) {
     if (!user) {
-      toast.info("Please sign in to join rooms", toastOptions)
-      router.push("/auth")
+      toast.info("Please sign in to join channels", toastOptions)
+      router.push("/signin")
       return
     }
 
@@ -246,33 +246,30 @@ export default function RoomsSection() {
 
   return (
     <div className="h-full w-full p-1.5">
-      <Card className="relative flex h-full w-full flex-col border border-border/40 bg-card/50 shadow-[0_8px_30px_rgb(0,0,0,0.03)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] backdrop-blur-md rounded-2xl p-0 overflow-hidden">
-        <CardHeader className="shrink-0 relative z-30 flex flex-col gap-3 border-b border-border/50 px-4 py-3 bg-card/40 backdrop-blur-sm w-full">
+      <Card className="relative flex h-full w-full flex-col border border-border/70 dark:border-border/40 bg-white/95 dark:bg-card/50 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] backdrop-blur-md rounded-2xl p-0 overflow-hidden">
+        <CardHeader className="shrink-0 relative z-30 flex flex-col gap-3 border-b border-border/60 dark:border-border/50 px-4 py-3 bg-white/80 dark:bg-card/40 backdrop-blur-sm w-full">
           <CardTitle className="flex w-full items-center justify-between gap-2">
             <AppIcon />
             {user ? (
               <DialogSettings />
             ) : (
-              <div className="flex items-center gap-1.5">
-                <Button
-                  type="button"
-                  variant="default"
-                  size="sm"
-                  className="h-7 rounded-lg px-2.5 text-xs font-semibold cursor-pointer shadow-[0_0_10px_rgba(244,187,68,0.3)] hover:shadow-[0_0_14px_rgba(244,187,68,0.5)]"
-                  onClick={() => router.push("/auth")}
-                >
-                  Sign In
-                </Button>
-                <ThemeToggleButton className="h-7 w-7" />
-              </div>
+              <ThemeToggleButton className="h-7 w-7" />
             )}
           </CardTitle>
 
           <CardDescription className="w-full">
             <div ref={searchContainerRef} className="relative w-full">
               <form
-                onSubmit={handleSearch}
-                className="flex h-8 items-center gap-2 rounded-full border border-border/40 bg-muted/60 px-2.5 transition-colors focus-within:border-primary/50 focus-within:bg-muted/80"
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  if (!user) return
+                  handleSearch(e)
+                }}
+                className={`flex h-8 items-center gap-2 rounded-full border border-border/60 bg-stone-100/90 dark:bg-muted/60 px-2.5 transition-colors ${
+                  !user
+                    ? "opacity-60 cursor-not-allowed"
+                    : "focus-within:border-primary/50 focus-within:bg-muted/80"
+                }`}
               >
                 <IconSearch
                   stroke={2}
@@ -281,17 +278,20 @@ export default function RoomsSection() {
                   className="shrink-0 text-muted-foreground"
                 />
                 <input
+                  disabled={!user}
                   value={searchName}
                   onChange={(event) => setSearchName(event.target.value)}
                   onFocus={() => {
-                    if (searchName.trim()) {
+                    if (searchName.trim() && user) {
                       setShowSearchDropdown(true)
                     }
                   }}
-                  placeholder="Search rooms to join..."
-                  className="flex-1 bg-transparent text-xs text-foreground outline-none placeholder:text-muted-foreground"
+                  placeholder={user ? "Search channels to join..." : "Channels"}
+                  className={`flex-1 bg-transparent text-xs text-foreground outline-none placeholder:text-muted-foreground ${
+                    !user ? "cursor-not-allowed" : ""
+                  }`}
                 />
-                {searchName && (
+                {searchName && user && (
                   <button
                     type="button"
                     onClick={resetSearch}
@@ -304,23 +304,13 @@ export default function RoomsSection() {
                 {user ? (
                   <DialogCreateRoom creatorId={user.id} />
                 ) : (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        type="button"
-                        onClick={() => {
-                          toast.info("Please sign in to create a room", toastOptions)
-                          router.push("/auth")
-                        }}
-                        className="flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center rounded-full border border-border/80 bg-background text-base leading-none text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                      >
-                        +
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Sign in to create a room</p>
-                    </TooltipContent>
-                  </Tooltip>
+                  <Button
+                    type="button"
+                    disabled
+                    className="flex h-5 w-5 shrink-0 cursor-not-allowed items-center justify-center rounded-full border border-border/40 bg-background text-base leading-none text-muted-foreground/40 opacity-50"
+                  >
+                    +
+                  </Button>
                 )}
               </form>
 
@@ -329,7 +319,7 @@ export default function RoomsSection() {
                 <div className="absolute top-full left-0 right-0 mt-2 z-50 flex flex-col rounded-2xl border border-border/80 dark:border-[#d4af37]/40 bg-popover dark:bg-[#18181b] p-2 shadow-[0_20px_50px_rgba(0,0,0,0.45)] dark:shadow-[0_25px_60px_rgba(0,0,0,0.8)] animate-in fade-in zoom-in-95 duration-150">
                   <div className="flex items-center justify-between px-2 py-1 mb-1 border-b border-border/40">
                     <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-                      {isSearching ? "Searching..." : `Rooms (${searchResults.length})`}
+                      {isSearching ? "Searching..." : `Channels (${searchResults.length})`}
                     </span>
                     <button
                       type="button"
@@ -348,7 +338,7 @@ export default function RoomsSection() {
                       </div>
                     ) : searchResults.length === 0 ? (
                       <div className="py-6 text-center text-xs text-muted-foreground">
-                        No rooms found with &quot;{searchName}&quot;
+                        No channels found with &quot;{searchName}&quot;
                       </div>
                     ) : (
                       searchResults.map((room) => {
@@ -443,44 +433,35 @@ export default function RoomsSection() {
         <CardContent className="relative z-0 min-h-0 flex-1 overflow-hidden p-0">
           <ScrollArea className="h-full w-full min-h-0 flex-1">
             <div className="space-y-1 px-3 py-2 sm:px-4">
-              {!user && myRooms.length === 0 && (
-                <div className="my-2 rounded-xl border border-dashed border-border/80 bg-card/40 p-4 text-center backdrop-blur-sm">
-                  <div className="mb-1 text-xs font-semibold text-foreground">
-                    Collaborate with Collab
+              {!user ? (
+                <div className="my-10 px-4 flex flex-col items-center justify-center text-center space-y-2 select-none opacity-60">
+                  <div className="rounded-full border border-border/50 bg-muted/40 p-3 text-muted-foreground">
+                    <IconLock size={20} />
                   </div>
-                  <p className="mb-3 text-[11px] leading-relaxed text-muted-foreground">
-                    Sign in with Pramaan to see your channels, or search for public rooms above.
+                  <p className="text-xs font-semibold text-foreground/80">Channels Locked</p>
+                  <p className="text-[11px] text-muted-foreground max-w-[200px] leading-relaxed">
+                    Channels and conversations are disabled. Sign in from the right to access your workspace.
                   </p>
-                  <Button
-                    type="button"
-                    size="sm"
-                    className="h-8 w-full rounded-lg text-xs font-semibold cursor-pointer"
-                    onClick={() => router.push("/auth")}
-                  >
-                    Sign In / Sign Up
-                  </Button>
                 </div>
-              )}
-
-              {user && myRooms.length === 0 && (
+              ) : myRooms.length === 0 ? (
                 <div className="rounded-lg border border-dashed border-border/70 px-3 py-6 text-center text-sm text-muted-foreground">
-                  No rooms joined yet. Use the search bar above to discover and join public rooms!
+                  No channels joined yet. Use the search bar above to discover and join public channels!
                 </div>
+              ) : (
+                myRooms.map((room) => (
+                  <ListItems
+                    key={room.id}
+                    room={room}
+                    isActive={activeRoom === room.id}
+                    onSelect={handleRoomSelect}
+                    currentUserId={user?.id ?? null}
+                    isSearchMode={false}
+                    onJoinRoom={handleJoinRoom}
+                    isJoining={joiningRoomId === room.id}
+                    hasPendingRequest={Boolean(pendingJoinRoomIds[room.id])}
+                  />
+                ))
               )}
-
-              {myRooms.map((room) => (
-                <ListItems
-                  key={room.id}
-                  room={room}
-                  isActive={activeRoom === room.id}
-                  onSelect={handleRoomSelect}
-                  currentUserId={user?.id ?? null}
-                  isSearchMode={false}
-                  onJoinRoom={handleJoinRoom}
-                  isJoining={joiningRoomId === room.id}
-                  hasPendingRequest={Boolean(pendingJoinRoomIds[room.id])}
-                />
-              ))}
             </div>
           </ScrollArea>
         </CardContent>
@@ -536,7 +517,13 @@ function ListItems({
   const toggleRoomPinned = useAppStore((state) => state.toggleRoomPinned)
   const toggleRoomMuted = useAppStore((state) => state.toggleRoomMuted)
   const toggleRoomUnread = useAppStore((state) => state.toggleRoomUnread)
+  const { leaveRoom: leaveRoomRequest } = useRooms()
+  const removeRoom = useAppStore((state) => state.removeRoom)
+  const clearMessages = useAppStore((state) => state.clearMessages)
+  const setActiveRoom = useAppStore((state) => state.setActiveRoom)
   const [showOptions, setShowOptions] = useState(false)
+  const [confirmLeaveOpen, setConfirmLeaveOpen] = useState(false)
+  const [isLeaving, setIsLeaving] = useState(false)
 
   const lastMessageText = room.lastMessage
     ? room.lastMessage.text?.trim() || "Attachment"
@@ -545,150 +532,227 @@ function ListItems({
     ? formatRoomTime(room.lastMessage.createdAt)
     : ""
 
+  async function handleConfirmLeave() {
+    if (isLeaving) return
+    setIsLeaving(true)
+
+    try {
+      await leaveRoomRequest(room.id, currentUserId ?? undefined)
+      wsClient.leaveRoom(room.id)
+      clearMessages(room.id)
+      removeRoom(room.id)
+      if (isActive) {
+        setActiveRoom(null)
+      }
+      setConfirmLeaveOpen(false)
+      toast.success(`Left ${room.name}`, toastOptions)
+    } catch (error) {
+      const message = axios.isAxiosError(error)
+        ? (error.response?.data?.error ??
+          error.response?.data?.message ??
+          "Unable to leave channel")
+        : "Unable to leave channel"
+      toast.error(message, toastOptions)
+    } finally {
+      setIsLeaving(false)
+    }
+  }
+
   return (
-    <div
-      onClick={() => {
-        if (!isSearchMode || isMember) {
-          onSelect(room)
-        }
-      }}
-      className={`group relative flex items-center justify-between rounded-xl px-2.5 py-2 transition-all duration-150 cursor-pointer ${
-        isActive
-          ? "border border-[#d4af37]/70 dark:border-[#f5d061]/70 bg-muted/70 text-foreground shadow-xs"
-          : "border border-transparent bg-card/40 hover:bg-muted/50 text-muted-foreground hover:text-foreground"
-      }`}
-    >
-      <div className="flex items-center gap-2.5 min-w-0 flex-1">
-        <Avatar className={`h-8 w-8 shrink-0 border transition-all ${isActive ? "border-[#d4af37]/60" : "border-border/60"}`}>
-          <AvatarImage
-            src={room.avatarUrl ?? undefined}
-            alt={room.name}
-          />
-          <AvatarFallback className="text-xs font-semibold bg-muted">
-            {room.name[0]?.toUpperCase()}
-          </AvatarFallback>
-          {isActive && (
-            <AvatarBadge className="right-0 bottom-0 h-2 w-2 border-[1.5px] border-background bg-emerald-500" />
-          )}
-        </Avatar>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center justify-between gap-1">
-            <div className={`truncate text-xs tracking-tight ${unread && !isActive ? "font-bold text-foreground" : isActive ? "font-semibold text-foreground" : "font-medium text-foreground/90"}`}>
-              {room.name}
+    <>
+      <div
+        onClick={() => {
+          if (!isSearchMode || isMember) {
+            onSelect(room)
+          }
+        }}
+        className={`group relative flex items-center justify-between rounded-xl px-2.5 py-2 transition-all duration-150 cursor-pointer ${
+          isActive
+            ? "border border-[#d4af37]/80 dark:border-[#f5d061]/70 bg-amber-500/10 dark:bg-muted/70 text-foreground shadow-xs"
+            : "border border-transparent bg-transparent hover:bg-stone-100/80 dark:hover:bg-muted/50 text-muted-foreground hover:text-foreground"
+        }`}
+      >
+        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+          <Avatar className={`h-8 w-8 shrink-0 border transition-all ${isActive ? "border-[#d4af37]/60" : "border-border/60"}`}>
+            <AvatarImage
+              src={room.avatarUrl ?? undefined}
+              alt={room.name}
+            />
+            <AvatarFallback className="text-xs font-semibold bg-muted">
+              {room.name[0]?.toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center justify-between gap-1">
+              <div className={`truncate text-xs tracking-tight ${unread && !isActive ? "font-bold text-foreground" : isActive ? "font-semibold text-foreground" : "font-medium text-foreground/90"}`}>
+                {room.name}
+              </div>
+              {lastMessageTime && (
+                <span className={`shrink-0 text-[10px] ${unread && !isActive ? "font-semibold text-primary" : "text-muted-foreground/70"}`}>
+                  {lastMessageTime}
+                </span>
+              )}
             </div>
-            {lastMessageTime && (
-              <span className={`shrink-0 text-[10px] ${unread && !isActive ? "font-semibold text-primary" : "text-muted-foreground/70"}`}>
-                {lastMessageTime}
-              </span>
+            {lastMessageText && (
+              <div className={`truncate text-[11px] leading-tight ${unread && !isActive ? "font-medium text-foreground/90" : "text-muted-foreground/80"}`}>
+                {lastMessageText}
+              </div>
             )}
           </div>
-          {lastMessageText && (
-            <div className={`truncate text-[11px] leading-tight ${unread && !isActive ? "font-medium text-foreground/90" : "text-muted-foreground/80"}`}>
-              {lastMessageText}
+        </div>
+
+        <div className="flex items-center gap-1.5 ml-2">
+          {isSearchMode &&
+            (room.isPrivate ? (
+              <IconLock size={14} className="text-muted-foreground" />
+            ) : (
+              <IconLockOpen2 size={14} className="text-muted-foreground" />
+            ))}
+          {isPinned && <IconPinned size={14} />}
+          {isMuted && <IconVolume3 size={14} />}
+          {unread && unreadCount > 0 && !isActive && (
+            <div className="flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground shadow-[0_0_8px_rgba(244,187,68,0.4)]">
+              {unreadCount > 99 ? "99+" : unreadCount}
             </div>
           )}
-        </div>
-      </div>
 
-      <div className="flex items-center gap-1.5 ml-2">
-        {isSearchMode &&
-          (room.isPrivate ? (
-            <IconLock size={14} className="text-muted-foreground" />
+          {isSearchMode && !isMember ? (
+            <Button
+              type="button"
+              size="sm"
+              className="h-7 px-2 text-xs"
+              disabled={isJoining || hasPendingRequest}
+              onClick={(event) => {
+                event.stopPropagation()
+                void onJoinRoom(room)
+              }}
+            >
+              {isJoining
+                ? "Please wait..."
+                : hasPendingRequest
+                  ? "Requested"
+                  : room.isPrivate
+                    ? "Request join"
+                    : "Join"}
+            </Button>
           ) : (
-            <IconLockOpen2 size={14} className="text-muted-foreground" />
-          ))}
-        {isPinned && <IconPinned size={14} />}
-        {isMuted && <IconVolume3 size={14} />}
-        {unread && unreadCount > 0 && !isActive && (
-          <div className="flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground shadow-[0_0_8px_rgba(244,187,68,0.4)]">
-            {unreadCount > 99 ? "99+" : unreadCount}
-          </div>
-        )}
+            <button
+              type="button"
+              className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground cursor-pointer"
+              aria-label="Channel options"
+              onClick={(event) => {
+                event.stopPropagation()
+                setShowOptions((current) => !current)
+              }}
+            >
+              <IconDotsVertical size={16} />
+            </button>
+          )}
+        </div>
 
-        {isSearchMode && !isMember ? (
-          <Button
-            type="button"
-            size="sm"
-            className="h-7 px-2 text-xs"
-            disabled={isJoining || hasPendingRequest}
-            onClick={(event) => {
-              event.stopPropagation()
-              void onJoinRoom(room)
-            }}
-          >
-            {isJoining
-              ? "Please wait..."
-              : hasPendingRequest
-                ? "Requested"
-                : room.isPrivate
-                  ? "Request join"
-                  : "Join"}
-          </Button>
-        ) : (
-          <button
-            type="button"
-            className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            aria-label="Room options"
-            onClick={(event) => {
-              event.stopPropagation()
-              setShowOptions((current) => !current)
-            }}
-          >
-            <IconDotsVertical size={16} />
-          </button>
+        {showOptions && !isSearchMode && (
+          <>
+            <button
+              type="button"
+              className="fixed inset-0 z-10 cursor-default bg-transparent"
+              aria-label="Close room options"
+              onClick={(event) => {
+                event.stopPropagation()
+                setShowOptions(false)
+              }}
+            />
+
+            <div
+              className="absolute top-10 right-2 z-20 w-40 rounded-xl border border-border/80 bg-popover p-1 shadow-lg backdrop-blur-md animate-in fade-in zoom-in-95 duration-100"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <button
+                type="button"
+                className="w-full rounded-lg px-2 py-1.5 text-left text-xs font-medium transition-colors hover:bg-muted cursor-pointer"
+                onClick={() => {
+                  toggleRoomPinned(room.id)
+                  setShowOptions(false)
+                }}
+              >
+                {isPinned ? "Unpin channel" : "Pin channel"}
+              </button>
+              <button
+                type="button"
+                className="w-full rounded-lg px-2 py-1.5 text-left text-xs font-medium transition-colors hover:bg-muted cursor-pointer"
+                onClick={() => {
+                  toggleRoomMuted(room.id)
+                  setShowOptions(false)
+                }}
+              >
+                {isMuted ? "Unmute channel" : "Mute channel"}
+              </button>
+              <button
+                type="button"
+                className="w-full rounded-lg px-2 py-1.5 text-left text-xs font-medium transition-colors hover:bg-muted cursor-pointer"
+                onClick={() => {
+                  toggleRoomUnread(room.id)
+                  setShowOptions(false)
+                }}
+              >
+                {unread ? "Mark as read" : "Mark as unread"}
+              </button>
+              {isMember && (
+                <>
+                  <div className="my-1 h-px bg-border/50" />
+                  <button
+                    type="button"
+                    className="w-full rounded-lg px-2 py-1.5 text-left text-xs font-medium text-destructive transition-colors hover:bg-destructive/10 cursor-pointer"
+                    onClick={() => {
+                      setShowOptions(false)
+                      setConfirmLeaveOpen(true)
+                    }}
+                  >
+                    Leave channel
+                  </button>
+                </>
+              )}
+            </div>
+          </>
         )}
       </div>
 
-      {showOptions && !isSearchMode && (
-        <>
-          <button
-            type="button"
-            className="fixed inset-0 z-10 cursor-default bg-transparent"
-            aria-label="Close room options"
-            onClick={(event) => {
-              event.stopPropagation()
-              setShowOptions(false)
-            }}
-          />
+      {/* Confirmation Modal to Leave Room */}
+      <Dialog open={confirmLeaveOpen} onOpenChange={setConfirmLeaveOpen}>
+        <DialogContent className="sm:max-w-sm border border-border/60 bg-card/95 backdrop-blur-xl rounded-2xl">
+          <DialogHeader className="space-y-2">
+            <DialogTitle className="text-base font-bold text-foreground">
+              Leave {room.name}?
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground leading-relaxed">
+              Are you sure you want to leave <span className="font-semibold text-foreground">{room.name}</span>? You will no longer receive or send messages in this channel unless you join again.
+            </DialogDescription>
+          </DialogHeader>
 
-          <div
-            className="absolute top-10 right-2 z-20 w-40 rounded-md border border-border bg-popover p-1 shadow-md"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <button
+          <div className="flex items-center justify-end gap-2 pt-3 border-t border-border/40">
+            <Button
               type="button"
-              className="w-full rounded-sm px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted"
-              onClick={() => {
-                toggleRoomPinned(room.id)
-                setShowOptions(false)
-              }}
+              variant="outline"
+              size="sm"
+              disabled={isLeaving}
+              onClick={() => setConfirmLeaveOpen(false)}
+              className="h-8 px-3 text-xs cursor-pointer"
             >
-              {isPinned ? "Unpin room" : "Pin room"}
-            </button>
-            <button
+              Cancel
+            </Button>
+            <Button
               type="button"
-              className="w-full rounded-sm px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted"
-              onClick={() => {
-                toggleRoomMuted(room.id)
-                setShowOptions(false)
-              }}
+              variant="destructive"
+              size="sm"
+              disabled={isLeaving}
+              onClick={() => void handleConfirmLeave()}
+              className="h-8 px-3 text-xs font-semibold cursor-pointer shadow-xs"
             >
-              {isMuted ? "Unmute room" : "Mute room"}
-            </button>
-            <button
-              type="button"
-              className="w-full rounded-sm px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted"
-              onClick={() => {
-                toggleRoomUnread(room.id)
-                setShowOptions(false)
-              }}
-            >
-              {unread ? "Mark as read" : "Mark as unread"}
-            </button>
+              {isLeaving ? "Leaving..." : "Leave Channel"}
+            </Button>
           </div>
-        </>
-      )}
-    </div>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
 
@@ -714,8 +778,8 @@ function DialogCreateRoom({ creatorId }: { creatorId: string }) {
   const roomFields: FieldConfig<CreateRoomFormInput>[] = [
     {
       name: "name",
-      label: "Room Name",
-      placeholder: "my room",
+      label: "Channel Name",
+      placeholder: "my channel",
       autoComplete: "off",
     },
     {
@@ -726,7 +790,7 @@ function DialogCreateRoom({ creatorId }: { creatorId: string }) {
     },
     {
       name: "isPrivate",
-      label: "Room Visibility",
+      label: "Channel Visibility",
       fieldType: "radio",
       options: [
         { label: "Public", value: "false" },
@@ -767,7 +831,7 @@ function DialogCreateRoom({ creatorId }: { creatorId: string }) {
       setFormKey((currentKey) => currentKey + 1)
       setAvatarUrl(null)
       setOpen(false)
-      toast.success("Room created", toastOptions)
+      toast.success("Channel created", toastOptions)
     } catch (error) {
       const message = axios.isAxiosError(error)
         ? (error.response?.data?.error ??
@@ -798,13 +862,13 @@ function DialogCreateRoom({ creatorId }: { creatorId: string }) {
           </DialogTrigger>
         </TooltipTrigger>
         <TooltipContent>
-          <p>Create Room</p>
+          <p>Create Channel</p>
         </TooltipContent>
       </Tooltip>
 
       <DialogContent className="sm:max-w-md" aria-describedby={undefined}>
         <DialogHeader>
-          <DialogTitle className="text-2xl">Create New Room</DialogTitle>
+          <DialogTitle className="text-2xl">Create New Channel</DialogTitle>
         </DialogHeader>
 
         <div className="flex flex-col items-center justify-center gap-2 pt-1 pb-3">
@@ -829,7 +893,7 @@ function DialogCreateRoom({ creatorId }: { creatorId: string }) {
               className="h-7 text-xs rounded-lg cursor-pointer"
               onClick={() => fileInputRef.current?.click()}
             >
-              Upload Room Icon
+              Upload Channel Icon
             </Button>
             {avatarUrl && (
               <Button
@@ -854,8 +918,8 @@ function DialogCreateRoom({ creatorId }: { creatorId: string }) {
           onSubmit={async (data) => {
             await createRoom(data)
           }}
-          submitLabel="Create room"
-          pendingLabel="Creating room..."
+          submitLabel="Create channel"
+          pendingLabel="Creating channel..."
         />
       </DialogContent>
     </Dialog>

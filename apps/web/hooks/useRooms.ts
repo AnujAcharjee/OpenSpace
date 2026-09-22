@@ -258,10 +258,31 @@ export const useRooms = () => {
     []
   )
 
+  const leaveRoom = useCallback(async (roomId: string, userId?: string) => {
+    const res = await axios.post<{
+      data?: {
+        room?: RoomRecord | null
+        roomId?: string
+        userId?: string
+      }
+      error?: string
+      message?: string
+    }>(
+      `${roomsApiUrl}/${roomId}/leave`,
+      { userId },
+      {
+        withCredentials: true,
+      }
+    )
+
+    return res.data.data
+  }, [])
+
   return {
     createRoom,
     updateRoom,
     deleteRoom,
+    leaveRoom,
     addMembers,
     removeMember,
     searchRooms,

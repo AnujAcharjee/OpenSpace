@@ -1,26 +1,44 @@
 "use client"
 
-import { useMemo, useState, Suspense } from "react"
-import { useSearchParams } from "next/navigation"
+import { useMemo, useState, useEffect, Suspense } from "react"
+import { useSearchParams, useRouter } from "next/navigation"
+import useAppStore from "@/stores/app-store"
 import { IconShieldCheck, IconLoader2 } from "@tabler/icons-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { pramaanAuthApiUrl } from "@/constants/apiUrls"
 import { AppIcon } from "@/components/AppIcon"
 
-function buildPramaanUrl() {
+function buildPramaanUrl(returnUrl?: string | null) {
   const url = new URL(pramaanAuthApiUrl)
   url.searchParams.set("mode", "signin")
+  if (returnUrl) {
+    url.searchParams.set("returnUrl", returnUrl)
+  }
   return url.toString()
 }
 
-function AuthContent() {
+function SignInContent() {
+  const router = useRouter()
   const searchParams = useSearchParams()
   const error = searchParams.get("error")
+  const returnUrl = searchParams.get("returnUrl")
+
+  const user = useAppStore((s) => s.user)
+  const hasHydrated = useAppStore((s) => s.hasHydrated)
 
   const [loading, setLoading] = useState(false)
 
-  const signinUrl = useMemo(() => buildPramaanUrl(), [])
+  const signinUrl = useMemo(() => buildPramaanUrl(returnUrl), [returnUrl])
+
+  useEffect(() => {
+    if (hasHydrated && user?.username) {
+      const destination = returnUrl
+        ? decodeURIComponent(returnUrl)
+        : `/@${encodeURIComponent(user.username)}`
+      router.replace(destination)
+    }
+  }, [hasHydrated, user, returnUrl, router])
 
   function handleNavigate(url: string) {
     setLoading(true)
@@ -41,7 +59,7 @@ function AuthContent() {
             <h1 className="text-2xl font-semibold text-foreground">Welcome back</h1>
 
             <p className="max-w-md text-sm leading-6 text-muted-foreground">
-              Sign in to continue to Collab using your secure Pramaan identity.
+              Sign in to continue to OpenSpace using your secure Pramaan identity.
             </p>
           </div>
         </CardHeader>
@@ -56,7 +74,7 @@ function AuthContent() {
           <div className="grid w-full gap-3">
             <Button
               size="lg"
-              className="h-12 rounded-xl text-sm font-semibold"
+              className="h-12 rounded-xl text-sm font-semibold cursor-pointer shadow-[0_0_20px_rgba(244,187,68,0.25)] hover:shadow-[0_0_25px_rgba(244,187,68,0.45)]"
               disabled={loading}
               onClick={() => handleNavigate(signinUrl)}
             >
@@ -92,14 +110,16 @@ function AuthContent() {
   )
 }
 
-export default function AuthPage() {
+export default function SignInPage() {
   return (
-    <Suspense fallback={
-      <div className="relative flex min-h-svh w-full items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_top,rgba(244,187,68,0.18),transparent_30%),linear-gradient(135deg,#fff8eb_0%,#fffdf8_45%,#f6f1e7_100%)] dark:bg-[radial-gradient(circle_at_top,rgba(244,187,68,0.10),transparent_35%),linear-gradient(135deg,#18181b_0%,#09090b_60%,#18181b_100%)]">
-        <IconLoader2 className="size-8 animate-spin text-primary" />
-      </div>
-    }>
-      <AuthContent />
+    <Suspense
+      fallback={
+        <div className="relative flex min-h-svh w-full items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_top,rgba(244,187,68,0.18),transparent_30%),linear-gradient(135deg,#fff8eb_0%,#fffdf8_45%,#f6f1e7_100%)] dark:bg-[radial-gradient(circle_at_top,rgba(244,187,68,0.10),transparent_35%),linear-gradient(135deg,#18181b_0%,#09090b_60%,#18181b_100%)]">
+          <IconLoader2 className="size-8 animate-spin text-primary" />
+        </div>
+      }
+    >
+      <SignInContent />
     </Suspense>
   )
 }
