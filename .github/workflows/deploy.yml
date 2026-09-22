@@ -52,8 +52,8 @@ jobs:
       - name: Run Automated Tests
         run: pnpm test
 
-  deploy:
-    name: Deploy to EC2 via SSH
+  build-and-push:
+    name: Build & Push Docker Images
     needs: test
     if: >-
       !contains(github.event.head_commit.message, '[skip deploy]') &&
@@ -63,7 +63,61 @@ jobs:
       !contains(github.event.head_commit.message, '[skip cd]') &&
       !contains(github.event.head_commit.message, '[skip-cd]')
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - api-gateway
+          - http-service
+          - chat-service
+          - ws-service
     steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME || 'anuj304' }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and Push Docker Image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          build-args: |
+            APP_NAME=${{ matrix.service }}
+          push: true
+          tags: |
+            anuj304/collab:${{ matrix.service }}
+            anuj304/collab:${{ matrix.service }}-${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Deploy to EC2 via SSH
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Copy Compose & Caddy Config to EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: "docker-compose.yml,Caddyfile"
+          target: "~/Collab"
+
       - name: Deploy Docker Compose Services
         uses: appleboy/ssh-action@v1.2.0
         with:
@@ -71,27 +125,19 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           timeout: 60s
-          command_timeout: 30m
+          command_timeout: 5m
           script: |
             set -e
 
-            # Auto-clone repo if it does not exist yet
-            if [ ! -d "$HOME/Collab" ]; then
-              git clone https://github.com/${{ github.repository }}.git $HOME/Collab
-            fi
-
-            # Navigate to project root directory
+            # Ensure project directory exists and navigate into it
+            mkdir -p "$HOME/Collab"
             cd "$HOME/Collab"
-
-            # Pull latest code from main
-            git fetch origin main
-            git reset --hard origin/main
 
             # Write production .env file (Safe public URIs/configs directly defined + secrets for credentials)
             cat << 'EOF' > .env
             NODE_ENV=production
             API_DOMAIN=${{ secrets.API_DOMAIN || 'api.collab.anujacharjee.com' }}
-            ACME_EMAIL=${{ secrets.ACME_EMAIL || 'anujacharjee36@gmail.com' }}
+            ACME_EMAIL=${{ secrets.ACME_EMAIL || 'me@anujacharjee.com' }}
 
             # Serverless Databases (Sensitive)
             REDIS_URL=${{ secrets.REDIS_URL }}
@@ -114,12 +160,16 @@ jobs:
             CALLBACK_URL=${{ secrets.CALLBACK_URL || 'https://api.collab.anujacharjee.com/api/v1/auth/pramaan/callback' }}
             EOF
 
-            # 1. Stop backend services and remove old containers (keep Caddy running)
-            docker compose stop api-gateway http-service chat-service ws-service || true
-            docker compose rm -f api-gateway http-service chat-service ws-service || true
+            # 1. Login to Docker Hub (if private repo)
+            if [ -n "${{ secrets.DOCKERHUB_TOKEN }}" ]; then
+              echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME || 'anuj304' }}" --password-stdin
+            fi
 
-            # 2. Build and start all services in detached mode (using cached layers)
-            docker compose up -d --build --remove-orphans
+            # 2. Pull latest images from Docker Hub in seconds
+            docker compose pull
 
-            # 3. Clean untagged dangling images after deployment
+            # 3. Recreate containers using pre-built images with zero build overhead
+            docker compose up -d --remove-orphans
+
+            # 4. Clean untagged dangling images after deployment
             docker image prune -f || true
