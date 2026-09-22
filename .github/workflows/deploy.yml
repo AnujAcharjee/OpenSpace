@@ -96,8 +96,8 @@ jobs:
             APP_NAME=${{ matrix.service }}
           push: true
           tags: |
-            anuj304/collab:${{ matrix.service }}
-            anuj304/collab:${{ matrix.service }}-${{ github.sha }}
+            anuj304/openspace:${{ matrix.service }}
+            anuj304/openspace:${{ matrix.service }}-${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 

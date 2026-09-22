@@ -31,7 +31,7 @@ services:
   # ─── API Gateway Service (:3005) ───────────────────────────────────────────
   api-gateway:
     <<: *default-logging
-    image: anuj304/collab:api-gateway
+    image: anuj304/openspace:api-gateway
     build:
       context: .
       dockerfile: Dockerfile
@@ -64,7 +64,7 @@ services:
   # ─── HTTP Service (:3001) ──────────────────────────────────────────────────
   http-service:
     <<: *default-logging
-    image: anuj304/collab:http-service
+    image: anuj304/openspace:http-service
     build:
       context: .
       dockerfile: Dockerfile
@@ -93,7 +93,7 @@ services:
   # ─── Chat Service & StreamWorker (:3000) ───────────────────────────────────
   chat-service:
     <<: *default-logging
-    image: anuj304/collab:chat-service
+    image: anuj304/openspace:chat-service
     build:
       context: .
       dockerfile: Dockerfile
@@ -113,7 +113,7 @@ services:
   # ─── WebSocket Service (:3002) ─────────────────────────────────────────────
   ws-service:
     <<: *default-logging
-    image: anuj304/collab:ws-service
+    image: anuj304/openspace:ws-service
     build:
       context: .
       dockerfile: Dockerfile
