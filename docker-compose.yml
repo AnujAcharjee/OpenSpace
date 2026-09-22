@@ -106,6 +106,7 @@ services:
       - PORT=3000
       - DATABASE_URL=${DATABASE_URL}
       - REDIS_URL=${REDIS_URL}
+      - WEB_APP_URL=${WEB_APP_URL}
       - GATEWAY_INTERNAL_SECRET=${GATEWAY_INTERNAL_SECRET}
     networks:
       - openspace_net

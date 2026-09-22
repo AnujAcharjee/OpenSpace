@@ -67,6 +67,12 @@ export function createServiceProxy({
         if (r.requestId) {
           response.setHeader('x-request-id', r.requestId);
         }
+
+        // Strip downstream microservice CORS headers so api-gateway CORS configuration governs
+        delete proxyRes.headers['access-control-allow-origin'];
+        delete proxyRes.headers['access-control-allow-credentials'];
+        delete proxyRes.headers['access-control-allow-methods'];
+        delete proxyRes.headers['access-control-allow-headers'];
       },
 
       error(err: Error, req: unknown) {
