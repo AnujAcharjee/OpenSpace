@@ -21,7 +21,7 @@ export const metadata: Metadata = {
     template: "%s | OpenSpace",
   },
   description:
-    "A real-time social platform to discover channels, join conversations, and connect with people worldwide through text, voice, and video.",
+    "Discover channels, join conversations, and connect with people worldwide through text, voice, and video.",
   keywords: [
     "OpenSpace",
     "real-time chat",
@@ -45,7 +45,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "OpenSpace — Discover Conversations & Communities",
     description:
-      "A real-time social platform to discover channels, join conversations, and connect with people worldwide through text, voice, and video.",
+      "Discover channels, join conversations, and connect with people worldwide through text, voice, and video.",
     url: "https://openspace.anujacharjee.com",
     siteName: "OpenSpace",
     locale: "en_US",
@@ -54,7 +54,7 @@ export const metadata: Metadata = {
       {
         url: "/og-image.png",
         width: 1200,
-        height: 675,
+        height: 630,
         alt: "OpenSpace — Discover Conversations & Communities",
       },
     ],
@@ -65,7 +65,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "OpenSpace — Discover Conversations & Communities",
     description:
-      "A real-time social platform to discover channels, join conversations, and connect with people worldwide through text, voice, and video.",
+      "Discover channels, join conversations, and connect with people worldwide through text, voice, and video.",
     images: ["/og-image.png"],
     creator: "@AnujAcharjee",
   },
@@ -105,7 +105,7 @@ const jsonLd = {
       url: "https://openspace.anujacharjee.com",
       name: "OpenSpace",
       description:
-        "A real-time social platform to discover channels, join conversations, and connect with people worldwide.",
+        "Discover channels, join conversations, and connect with people worldwide through text, voice, and video.",
       publisher: {
         "@type": "Person",
         name: "Anuj Acharjee",
