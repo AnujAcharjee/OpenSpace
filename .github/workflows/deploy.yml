@@ -116,7 +116,7 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           source: "docker-compose.yml,Caddyfile"
-          target: "~/Collab"
+          target: "~/OpenSpace"
 
       - name: Deploy Docker Compose Services
         uses: appleboy/ssh-action@v1.2.0
@@ -130,13 +130,13 @@ jobs:
             set -e
 
             # Ensure project directory exists and navigate into it
-            mkdir -p "$HOME/Collab"
-            cd "$HOME/Collab"
+            mkdir -p "$HOME/OpenSpace"
+            cd "$HOME/OpenSpace"
 
             # Write production .env file (Safe public URIs/configs directly defined + secrets for credentials)
             cat << 'EOF' > .env
             NODE_ENV=production
-            API_DOMAIN=${{ secrets.API_DOMAIN || 'api.collab.anujacharjee.com' }}
+            API_DOMAIN=${{ secrets.API_DOMAIN || 'api.openspace.anujacharjee.com' }}
             ACME_EMAIL=${{ secrets.ACME_EMAIL || 'me@anujacharjee.com' }}
 
             # Serverless Databases (Sensitive)
@@ -144,7 +144,7 @@ jobs:
             DATABASE_URL=${{ secrets.DATABASE_URL }}
 
             # Frontend Allowed Origin & Cookie Settings (Public / Non-sensitive)
-            WEB_APP_URL=${{ secrets.WEB_APP_URL || 'https://collab.anujacharjee.com' }}
+            WEB_APP_URL=${{ secrets.WEB_APP_URL || 'https://openspace.anujacharjee.com' }}
             COOKIE_DOMAIN=${{ secrets.COOKIE_DOMAIN || '.anujacharjee.com' }}
             COOKIE_SAME_SITE=${{ secrets.COOKIE_SAME_SITE || 'lax' }}
             ACCESS_TOKEN_COOKIE_NAME=${{ secrets.ACCESS_TOKEN_COOKIE_NAME || 'accessToken' }}
@@ -157,7 +157,7 @@ jobs:
             PRAMAAN_CLIENT_ID=${{ secrets.PRAMAAN_CLIENT_ID }}
             PRAMAAN_SECRET=${{ secrets.PRAMAAN_CLIENT_SECRET || secrets.PRAMAAN_SECRET }}
             PRAMAAN_SERVER_URL=${{ secrets.PRAMAAN_SERVER_URL || 'https://pramaan.anujacharjee.com' }}
-            CALLBACK_URL=${{ secrets.CALLBACK_URL || 'https://api.collab.anujacharjee.com/api/v1/auth/pramaan/callback' }}
+            CALLBACK_URL=${{ secrets.CALLBACK_URL || 'https://api.openspace.anujacharjee.com/api/v1/auth/pramaan/callback' }}
             EOF
 
             # 1. Login to Docker Hub (if private repo)

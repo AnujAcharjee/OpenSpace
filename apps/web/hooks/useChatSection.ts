@@ -14,6 +14,15 @@ import type { RoomMessage } from "@/stores/app-store"
 import { toast } from "sonner"
 import axios from "axios"
 import { wsClient } from "@/ws"
+import { uploadChatAttachment, type ChatAttachment } from "@/utils/cloudinary"
+
+export interface StagedAttachment {
+  file: File
+  previewUrl: string
+  type: "IMAGE" | "PDF" | "FILE"
+  name: string
+  size: number
+}
 
 const EMPTY_ROOM_MESSAGES: RoomMessage[] = []
 const EMPTY_JOIN_REQUESTS: RoomJoinRequestRecord[] = []
@@ -180,40 +189,114 @@ function useSendMessage(
   const { createMessage } = useMessage()
   const [draft, setDraft] = useState("")
   const [isSending, setIsSending] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [stagedAttachment, setStagedAttachment] = useState<StagedAttachment | null>(null)
+
+  const clearStagedAttachment = () => {
+    if (stagedAttachment?.previewUrl) {
+      URL.revokeObjectURL(stagedAttachment.previewUrl)
+    }
+    setStagedAttachment(null)
+    setUploadProgress(0)
+  }
+
+  const stageAttachment = (file: File) => {
+    const isImage = file.type.startsWith("image/")
+    const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")
+
+    if (!isImage && !isPdf) {
+      toast.error("Only images and PDFs are supported", toastOptions)
+      return
+    }
+
+    const MAX_SIZE_BYTES = 25 * 1024 * 1024 // 25 MB
+    if (file.size > MAX_SIZE_BYTES) {
+      toast.error("File size exceeds 25 MB limit", toastOptions)
+      return
+    }
+
+    if (stagedAttachment?.previewUrl) {
+      URL.revokeObjectURL(stagedAttachment.previewUrl)
+    }
+
+    const previewUrl = isImage ? URL.createObjectURL(file) : ""
+    setStagedAttachment({
+      file,
+      previewUrl,
+      type: isImage ? "IMAGE" : isPdf ? "PDF" : "FILE",
+      name: file.name,
+      size: file.size,
+    })
+    setUploadProgress(0)
+  }
 
   async function sendMessage() {
     const text = draft.trim()
-    if (!text || isSending || !userId) return
+    if ((!text && !stagedAttachment) || isSending || !userId) return
 
-    // Immediately clear draft and reply state for snappy Discord-like UX
+    const pendingAttachment = stagedAttachment
+    const previousDraft = draft
+
+    // Clear draft and state optimistically
     setDraft("")
+    setStagedAttachment(null)
     onSent()
     setIsSending(true)
 
     try {
+      let uploadedAttachment: ChatAttachment | null = null
+
+      if (pendingAttachment) {
+        uploadedAttachment = await uploadChatAttachment(
+          pendingAttachment.file,
+          (progress) => setUploadProgress(progress)
+        )
+      }
+
       const payload: CreateMessageInput["body"] = {
         sender: userId,
         roomId: room.id,
-        text,
+        text: text.length > 0 ? text : undefined,
+        attachments: uploadedAttachment ? JSON.stringify([uploadedAttachment]) : undefined,
+        type: uploadedAttachment
+          ? uploadedAttachment.type === "IMAGE"
+            ? "IMAGE"
+            : "FILE"
+          : "TEXT",
         parentId: replyingTo?.id,
       }
+
       const message = await createMessage(payload)
+      if (pendingAttachment?.previewUrl) {
+        URL.revokeObjectURL(pendingAttachment.previewUrl)
+      }
       addMessage(room.id, toRoomMessage(message))
       updateRoomLastMessage(room.id, toRoomPreviewMessage(message))
     } catch (error) {
-      setDraft(text) // Restore text on failure
+      setDraft(previousDraft) // Restore draft on failure
+      setStagedAttachment(pendingAttachment) // Restore attachment on failure
       const message = axios.isAxiosError(error)
         ? (error.response?.data?.error ??
           error.response?.data?.message ??
           "Unable to send message")
-        : "Unable to send message"
+        : (error instanceof Error ? error.message : "Unable to send message")
       toast.error(message, toastOptions)
     } finally {
       setIsSending(false)
+      setUploadProgress(0)
     }
   }
 
-  return { draft, setDraft, isSending, sendMessage }
+  return {
+    draft,
+    setDraft,
+    isSending,
+    uploadProgress,
+    stagedAttachment,
+    stageAttachment,
+    clearStagedAttachment,
+    sendMessage,
+  }
 }
 
 // ─── useDeleteMessage ────────────────────────────────────────────────────────
@@ -589,7 +672,16 @@ export function useChatSection(room: RoomRecord | null) {
     clearReply
   )
 
-  const { draft, setDraft, isSending, sendMessage } = useSendMessage(
+  const {
+    draft,
+    setDraft,
+    isSending,
+    uploadProgress,
+    stagedAttachment,
+    stageAttachment,
+    clearStagedAttachment,
+    sendMessage,
+  } = useSendMessage(
     room!,
     user?.id ?? "",
     replyingTo,
@@ -624,6 +716,10 @@ export function useChatSection(room: RoomRecord | null) {
     draft,
     setDraft,
     isSending,
+    uploadProgress,
+    stagedAttachment,
+    stageAttachment,
+    clearStagedAttachment,
     sendMessage,
     getAuthorName,
     getAuthorAvatar,

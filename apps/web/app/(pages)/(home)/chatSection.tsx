@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useRef } from "react"
+import { useEffect, useState, useRef, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import useAppStore from "@/stores/app-store"
@@ -44,7 +44,12 @@ import {
   IconPlus,
   IconVideo,
   IconMessageCircle,
+  IconFileTypePdf,
+  IconDownload,
+  IconExternalLink,
+  IconLoader2,
 } from "@tabler/icons-react"
+import type { ChatAttachment } from "@/utils/cloudinary"
 import { wsClient } from "@/ws"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
@@ -103,7 +108,21 @@ const editRoomFormSchema = z.object({
   isPrivate: z.enum(["false", "true"]),
 })
 
-export default function ChatSection({ room }: { room: RoomRecord | null }) {
+export function formatFileSize(bytes?: number): string {
+  if (!bytes || bytes <= 0) return "0 B"
+  const k = 1024
+  const sizes = ["B", "KB", "MB", "GB"]
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`
+}
+
+export default function ChatSection({
+  room,
+  onShowSidebar,
+}: {
+  room: RoomRecord | null
+  onShowSidebar?: () => void
+}) {
   const router = useRouter()
   const {
     user,
@@ -124,13 +143,57 @@ export default function ChatSection({ room }: { room: RoomRecord | null }) {
     draft,
     setDraft,
     isSending,
+    uploadProgress,
+    stagedAttachment,
+    stageAttachment,
+    clearStagedAttachment,
     sendMessage,
     getAuthorName,
     getAuthorAvatar,
     getMessageBody,
   } = useChatSection(room)
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
+  const [lightboxMedia, setLightboxMedia] = useState<{ url: string; name: string } | null>(null)
+  const [isDragOver, setIsDragOver] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  const chatFileInputRef = useRef<HTMLInputElement>(null)
+
+  const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    const items = e.clipboardData?.items
+    if (!items) return
+    for (const item of Array.from(items)) {
+      if (item.type.startsWith("image/") || item.type === "application/pdf") {
+        const file = item.getAsFile()
+        if (file) {
+          e.preventDefault()
+          stageAttachment(file)
+          break
+        }
+      }
+    }
+  }
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!isDragOver) setIsDragOver(true)
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragOver(false)
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragOver(false)
+    const file = e.dataTransfer.files?.[0]
+    if (file) {
+      stageAttachment(file)
+    }
+  }
 
   const { getPendingJoinRequests: getPendingJoinRequestsRequest } = useRooms()
   const pendingRequests = useAppStore(
@@ -366,7 +429,23 @@ export default function ChatSection({ room }: { room: RoomRecord | null }) {
               onShowChat={closeMembersPanel}
             />
           ) : (
-            <div className="flex h-full min-h-0 flex-col overflow-hidden">
+            <div
+              className="relative flex h-full min-h-0 flex-col overflow-hidden"
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+            >
+              {/* Drag and drop overlay */}
+              {isDragOver && (
+                <div className="absolute inset-0 z-30 flex flex-col items-center justify-center rounded-2xl bg-background/85 backdrop-blur-xs border-2 border-dashed border-primary animate-in fade-in duration-150">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/20 text-primary shadow-lg animate-bounce">
+                    <IconPhoto size={30} stroke={2} />
+                  </div>
+                  <div className="mt-3 text-sm font-semibold text-foreground">Drop file to attach</div>
+                  <div className="text-xs text-muted-foreground">Supports all images and PDF documents</div>
+                </div>
+              )}
+
               {canManageRoom && pendingRequests.length > 0 && (
                 <div className="shrink-0 mx-3 mt-2 flex items-center justify-between rounded-xl border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs text-foreground backdrop-blur-md animate-in fade-in slide-in-from-top-1 duration-200">
                   <div className="flex items-center gap-2">
@@ -449,6 +528,7 @@ export default function ChatSection({ room }: { room: RoomRecord | null }) {
                       message={
                         message.isDeleted ? "Message deleted" : message.text
                       }
+                      attachments={message.attachments}
                       timestamp={formatMessageTime(message.createdAt)}
                       isOwn={isOwn}
                       canDelete={
@@ -459,6 +539,7 @@ export default function ChatSection({ room }: { room: RoomRecord | null }) {
                       onReply={() => setReplyingTo(message)}
                       onDelete={() => void handleDeleteMessage(message.id)}
                       onJumpToParent={() => handleScrollToMessage(message.parentId ?? message.parent?.id)}
+                      onPreviewImage={(url, name) => setLightboxMedia({ url, name })}
                     />
                   )
                 })}
@@ -506,6 +587,66 @@ export default function ChatSection({ room }: { room: RoomRecord | null }) {
                     }}
                   />
 
+                  {/* Staged Attachment Preview Bar */}
+                  {stagedAttachment && (
+                    <div className="relative flex items-center justify-between gap-3 rounded-xl border border-primary/30 bg-card/95 dark:bg-card/90 shadow-md backdrop-blur-md px-3 py-2 animate-in slide-in-from-bottom-2 fade-in duration-200">
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        {stagedAttachment.type === "IMAGE" ? (
+                          <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-lg border border-border/60 bg-muted/40 shadow-xs">
+                            <img
+                              src={stagedAttachment.previewUrl}
+                              alt={stagedAttachment.name}
+                              className="h-full w-full object-cover"
+                            />
+                          </div>
+                        ) : (
+                          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-red-500/10 text-red-500 dark:text-red-400 border border-red-500/20 shadow-xs">
+                            <IconFileTypePdf size={22} stroke={1.8} />
+                          </div>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="truncate text-xs font-semibold text-foreground">
+                              {stagedAttachment.name}
+                            </span>
+                            <span className="shrink-0 rounded bg-muted/80 px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground">
+                              {formatFileSize(stagedAttachment.size)}
+                            </span>
+                          </div>
+                          {isSending ? (
+                            <div className="mt-1 space-y-1">
+                              <div className="flex items-center justify-between text-[10px] text-primary font-medium">
+                                <span>Uploading attachment...</span>
+                                <span>{uploadProgress}%</span>
+                              </div>
+                              <div className="h-1 w-full overflow-hidden rounded-full bg-muted">
+                                <div
+                                  className="h-full bg-primary transition-all duration-200"
+                                  style={{ width: `${uploadProgress}%` }}
+                                />
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="text-[11px] text-muted-foreground">
+                              Ready to send — add caption or click send
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      {!isSending && (
+                        <button
+                          type="button"
+                          onClick={clearStagedAttachment}
+                          className="rounded-lg p-1.5 text-muted-foreground transition-all duration-150 hover:bg-muted/80 hover:text-foreground hover:rotate-90 active:scale-95 cursor-pointer shrink-0"
+                          title="Remove attachment"
+                          aria-label="Remove attachment"
+                        >
+                          <IconX size={15} />
+                        </button>
+                      )}
+                    </div>
+                  )}
+
                   {/* Modern Glassmorphic Reply Banner */}
                   {replyingTo && (
                     <div className="flex items-center justify-between gap-2.5 rounded-xl border border-primary/40 bg-card/95 dark:bg-card/90 shadow-md backdrop-blur-md px-3 py-2 animate-in slide-in-from-bottom-2 fade-in duration-200">
@@ -536,10 +677,24 @@ export default function ChatSection({ room }: { room: RoomRecord | null }) {
                   )}
 
                   <InputGroup className="h-9.5 w-full border border-primary/40 bg-background/90 shadow-xs backdrop-blur-sm rounded-xl">
+                    <input
+                      type="file"
+                      ref={chatFileInputRef}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (file) {
+                          stageAttachment(file)
+                        }
+                        e.target.value = ""
+                      }}
+                      accept="image/*,application/pdf"
+                      className="hidden"
+                    />
                     <InputGroupInput
                       ref={inputRef}
                       value={draft}
                       onChange={(e) => setDraft(e.target.value)}
+                      onPaste={handlePaste}
                       placeholder={
                         !user
                           ? "Sign in to send messages"
@@ -547,17 +702,32 @@ export default function ChatSection({ room }: { room: RoomRecord | null }) {
                             ? "You cannot send messages to this channel"
                             : replyingTo
                               ? `Reply to @${getAuthorName(replyingTo)}...`
-                              : `Message ${room.name}`
+                              : stagedAttachment
+                                ? "Add a caption..."
+                                : `Message ${room.name}`
                       }
                       disabled={!user || !room.members.some((m) => m.userId === user.id) || isSending}
                     />
                     <InputGroupAddon>
-                      <IconPaperclip
-                        stroke={2}
-                        height={20}
-                        width={20}
-                        className="cursor-not-allowed text-muted-foreground/60"
-                      />
+                      <button
+                        type="button"
+                        onClick={() => chatFileInputRef.current?.click()}
+                        disabled={!user || !room.members.some((m) => m.userId === user.id) || isSending}
+                        className="rounded p-0.5 text-muted-foreground transition-all hover:text-foreground active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+                        title="Attach image or PDF"
+                        aria-label="Attach file"
+                      >
+                        <IconPaperclip
+                          stroke={2}
+                          height={19}
+                          width={19}
+                          className={
+                            stagedAttachment
+                              ? "text-primary"
+                              : "text-muted-foreground hover:text-foreground"
+                          }
+                        />
+                      </button>
                       <button
                         type="button"
                         onClick={() => setShowEmojiPicker((prev) => !prev)}
@@ -586,12 +756,16 @@ export default function ChatSection({ room }: { room: RoomRecord | null }) {
                         disabled={
                           !user ||
                           !room.members.some((m) => m.userId === user.id) ||
-                          !draft.trim() ||
+                          (!draft.trim() && !stagedAttachment) ||
                           isSending
                         }
                         className="text-muted-foreground hover:text-foreground"
                       >
-                        <IconBrandTelegram stroke={2} height={18} width={18} />
+                        {isSending ? (
+                          <IconLoader2 stroke={2} height={18} width={18} className="animate-spin text-primary" />
+                        ) : (
+                          <IconBrandTelegram stroke={2} height={18} width={18} />
+                        )}
                       </InputGroupButton>
                     </InputGroupAddon>
                   </InputGroup>
@@ -610,6 +784,38 @@ export default function ChatSection({ room }: { room: RoomRecord | null }) {
           </CardFooter>
         )}
       </Card>
+
+      {/* Lightbox Modal for high-resolution image preview */}
+      {lightboxMedia && (
+        <Dialog open={Boolean(lightboxMedia)} onOpenChange={(open) => !open && setLightboxMedia(null)}>
+          <DialogContent className="max-w-4xl p-0 bg-background/95 backdrop-blur-xl border border-border/60 rounded-2xl overflow-hidden shadow-2xl">
+            <DialogHeader className="px-4 py-3 flex flex-row items-center justify-between border-b border-border/40">
+              <DialogTitle className="text-sm font-semibold truncate max-w-md text-foreground">
+                {lightboxMedia.name}
+              </DialogTitle>
+              <div className="flex items-center gap-2 pr-6">
+                <a
+                  href={lightboxMedia.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  download={lightboxMedia.name}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 transition cursor-pointer"
+                >
+                  <IconDownload size={14} />
+                  <span>Download</span>
+                </a>
+              </div>
+            </DialogHeader>
+            <div className="flex items-center justify-center p-3 sm:p-6 max-h-[80vh] overflow-hidden bg-black/10 dark:bg-black/30">
+              <img
+                src={lightboxMedia.url}
+                alt={lightboxMedia.name}
+                className="max-h-[72vh] w-auto max-w-full rounded-xl object-contain shadow-xl"
+              />
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   )
 }
@@ -644,12 +850,14 @@ function MessageBubble({
   parentId,
   parentMessage,
   message,
+  attachments,
   timestamp,
   isOwn = false,
   canDelete = false,
   onReply,
   onDelete,
   onJumpToParent,
+  onPreviewImage,
 }: {
   id?: string
   username: string
@@ -657,14 +865,26 @@ function MessageBubble({
   parentId?: string
   parentMessage?: MessageBubbleParent
   message?: string
+  attachments?: string
   timestamp: string
   isOwn?: boolean
   canDelete?: boolean
   onReply: () => void
   onDelete: () => void
   onJumpToParent?: () => void
+  onPreviewImage?: (url: string, name: string) => void
 }) {
-  const fallbackMessage = message?.trim() ? message : "Attachment"
+  const parsedAttachments = useMemo<ChatAttachment[]>(() => {
+    if (!attachments) return []
+    try {
+      const parsed = typeof attachments === "string" ? JSON.parse(attachments) : attachments
+      return Array.isArray(parsed) ? parsed : [parsed]
+    } catch {
+      return []
+    }
+  }, [attachments])
+
+  const fallbackMessage = message?.trim() ? message : parsedAttachments.length > 0 ? "" : "Attachment"
   const fallbackParentMessage = parentMessage?.isDeleted
     ? "Message deleted"
     : parentMessage?.message?.trim()
@@ -674,9 +894,10 @@ function MessageBubble({
         : ""
 
   const handleCopy = () => {
-    if (fallbackMessage) {
-      void navigator.clipboard.writeText(fallbackMessage)
-      toast.success("Message copied to clipboard", toastOptions)
+    const textToCopy = message?.trim() || parsedAttachments[0]?.url || ""
+    if (textToCopy) {
+      void navigator.clipboard.writeText(textToCopy)
+      toast.success("Copied to clipboard", toastOptions)
     }
   }
 
@@ -701,7 +922,7 @@ function MessageBubble({
       <ContextMenu>
         <ContextMenuTrigger asChild>
           <div
-            className={`relative flex min-w-0 max-w-[82%] sm:max-w-[70%] flex-col select-text ${
+            className={`relative flex min-w-0 max-w-[85%] sm:max-w-[75%] flex-col select-text ${
               isOwn ? "items-end" : "items-start"
             }`}
           >
@@ -799,10 +1020,98 @@ function MessageBubble({
                 </div>
               )}
 
+              {/* Attachments rendering */}
+              {parsedAttachments.length > 0 && (
+                <div className="space-y-2 mb-1.5">
+                  {parsedAttachments.map((att, idx) => {
+                    const isImage = att.type === "IMAGE" || att.mimeType?.startsWith("image/")
+                    const isPdf = att.type === "PDF" || att.mimeType === "application/pdf" || att.name?.toLowerCase().endsWith(".pdf")
+
+                    if (isImage) {
+                      return (
+                        <div
+                          key={att.id || idx}
+                          className="group/img relative overflow-hidden rounded-xl border border-border/40 bg-black/5 dark:bg-white/5 cursor-zoom-in max-w-sm"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            onPreviewImage?.(att.url, att.name || "Image")
+                          }}
+                        >
+                          <img
+                            src={att.url}
+                            alt={att.name || "Attachment"}
+                            className="max-h-72 w-auto max-w-full rounded-xl object-contain transition-transform duration-200 group-hover/img:scale-[1.01]"
+                            loading="lazy"
+                          />
+                          <div className="absolute inset-0 bg-black/0 group-hover/img:bg-black/20 transition-colors flex items-end justify-end p-2 opacity-0 group-hover/img:opacity-100">
+                            <span className="rounded-lg bg-black/70 backdrop-blur-xs px-2 py-1 text-[10px] text-white font-medium flex items-center gap-1">
+                              <IconPhoto size={12} />
+                              Click to expand
+                            </span>
+                          </div>
+                        </div>
+                      )
+                    }
+
+                    if (isPdf) {
+                      return (
+                        <div
+                          key={att.id || idx}
+                          className="flex items-center gap-2.5 rounded-xl border border-border/60 bg-card/85 dark:bg-card/60 p-2.5 max-w-sm shadow-2xs backdrop-blur-xs transition hover:bg-card/95"
+                        >
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-500/10 text-red-500 dark:text-red-400 border border-red-500/20">
+                            <IconFileTypePdf size={22} stroke={1.8} />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-xs font-semibold text-foreground" title={att.name}>
+                              {att.name || "Document.pdf"}
+                            </div>
+                            <div className="text-[10px] text-muted-foreground font-mono">
+                              {formatFileSize(att.size)} • PDF
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <a
+                              href={att.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/80 transition"
+                              title="Open in new tab"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <IconExternalLink size={15} />
+                            </a>
+                            <a
+                              href={att.url}
+                              download={att.name || "document.pdf"}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/80 transition"
+                              title="Download PDF"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <IconDownload size={15} />
+                            </a>
+                          </div>
+                        </div>
+                      )
+                    }
+
+                    return null
+                  })}
+                </div>
+              )}
+
               {/* Message text */}
-              <div className="break-words [overflow-wrap:anywhere] whitespace-pre-wrap selection:bg-primary/20">
-                {fallbackMessage}
-              </div>
+              {message?.trim() ? (
+                <div className="break-words [overflow-wrap:anywhere] whitespace-pre-wrap selection:bg-primary/20">
+                  {message}
+                </div>
+              ) : parsedAttachments.length === 0 ? (
+                <div className="break-words [overflow-wrap:anywhere] whitespace-pre-wrap selection:bg-primary/20">
+                  {fallbackMessage}
+                </div>
+              ) : null}
 
               {/* Timestamp at bottom right inside the bubble */}
               <div className="mt-1 flex items-center justify-end gap-1 select-none">

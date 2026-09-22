@@ -19,8 +19,8 @@ describe('Cookie utils', () => {
 
   describe('getCookieDomain', () => {
     it('returns explicit domain with leading dot when COOKIE_DOMAIN is set', () => {
-      process.env.COOKIE_DOMAIN = 'collab.anujacharjee.com';
-      expect(getCookieDomain()).toBe('.collab.anujacharjee.com');
+      process.env.COOKIE_DOMAIN = 'openspace.anujacharjee.com';
+      expect(getCookieDomain()).toBe('.openspace.anujacharjee.com');
 
       process.env.COOKIE_DOMAIN = '.anujacharjee.com';
       expect(getCookieDomain()).toBe('.anujacharjee.com');
@@ -36,8 +36,8 @@ describe('Cookie utils', () => {
 
     it('infers domain from WEB_APP_URL when COOKIE_DOMAIN is not provided', () => {
       delete process.env.COOKIE_DOMAIN;
-      process.env.WEB_APP_URL = 'https://collab.anujacharjee.com';
-      expect(getCookieDomain()).toBe('.collab.anujacharjee.com');
+      process.env.WEB_APP_URL = 'https://openspace.anujacharjee.com';
+      expect(getCookieDomain()).toBe('.openspace.anujacharjee.com');
     });
 
     it('returns undefined when WEB_APP_URL is localhost or an IP', () => {
@@ -68,7 +68,7 @@ describe('Cookie utils', () => {
   describe('getAuthCookieOptions', () => {
     it('builds valid cookie options for production', () => {
       process.env.NODE_ENV = 'production';
-      process.env.COOKIE_DOMAIN = 'collab.anujacharjee.com';
+      process.env.COOKIE_DOMAIN = 'openspace.anujacharjee.com';
       const options = getAuthCookieOptions(3600);
 
       expect(options).toEqual({
@@ -76,7 +76,7 @@ describe('Cookie utils', () => {
         secure: true,
         sameSite: 'lax',
         path: '/',
-        domain: '.collab.anujacharjee.com',
+        domain: '.openspace.anujacharjee.com',
         maxAge: 3600000,
       });
     });
@@ -84,12 +84,12 @@ describe('Cookie utils', () => {
 
   describe('getClearAuthCookieOptions', () => {
     it('matches domain and path for clearing cookies', () => {
-      process.env.COOKIE_DOMAIN = '.collab.anujacharjee.com';
+      process.env.COOKIE_DOMAIN = '.openspace.anujacharjee.com';
       const options = getClearAuthCookieOptions();
 
       expect(options).toEqual({
         path: '/',
-        domain: '.collab.anujacharjee.com',
+        domain: '.openspace.anujacharjee.com',
       });
     });
   });
