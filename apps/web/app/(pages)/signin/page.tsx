@@ -10,7 +10,12 @@ import { pramaanAuthApiUrl } from "@/constants/apiUrls"
 import { AppIcon } from "@/components/AppIcon"
 
 function buildPramaanUrl(returnUrl?: string | null) {
-  const url = new URL(pramaanAuthApiUrl)
+  const base = pramaanAuthApiUrl.startsWith("http")
+    ? pramaanAuthApiUrl
+    : typeof window !== "undefined"
+      ? `${window.location.origin}${pramaanAuthApiUrl}`
+      : `http://localhost:3000${pramaanAuthApiUrl}`
+  const url = new URL(base)
   url.searchParams.set("mode", "signin")
   if (returnUrl) {
     url.searchParams.set("returnUrl", returnUrl)

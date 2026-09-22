@@ -13,7 +13,7 @@ import axios from "axios"
 import { handlers } from "./handlers"
 import { usersApiUrl } from "@/constants/apiUrls"
 
-const wsUrl: string = process.env.NEXT_PUBLIC_WS_SRV_URL!
+const wsUrl: string = process.env.NEXT_PUBLIC_WS_SRV_URL || "ws://localhost:3002"
 type WsTicketUser = IssueTicketRequest["body"]
 
 class Ws {

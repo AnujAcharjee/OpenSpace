@@ -140,7 +140,7 @@ export default function HomePage() {
         <div className="mb-16 flex flex-col items-center justify-center gap-3 sm:flex-row">
           <Link
             href={appUrl}
-            className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-8 text-sm font-semibold text-primary-foreground shadow-[0_0_20px_rgba(212,175,55,0.4)] transition-all duration-200 hover:shadow-[0_0_28px_rgba(212,175,55,0.6)] hover:brightness-105 active:scale-95 sm:w-auto cursor-pointer"
+            className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-8 text-sm font-semibold text-primary-foreground shadow-[0_0_20px_rgba(212,175,55,0.4)] dark:shadow-none transition-all duration-200 hover:shadow-[0_0_28px_rgba(212,175,55,0.6)] dark:hover:shadow-none hover:brightness-105 active:scale-95 sm:w-auto cursor-pointer"
           >
             Start Exploring
           </Link>
@@ -247,7 +247,7 @@ export default function HomePage() {
             <div className="col-span-12 sm:col-span-7 rounded-xl border border-border/70 dark:border-border/40 bg-white/95 dark:bg-card/50 shadow-sm dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] backdrop-blur-md overflow-hidden flex flex-col justify-center items-center text-center p-6 min-h-[320px]">
               <div className="flex flex-col items-center max-w-sm space-y-3.5">
                 <div className="relative flex items-center justify-center py-2">
-                  <div className="pointer-events-none absolute -inset-6 rounded-full bg-[radial-gradient(circle,rgba(244,208,63,0.15)_0%,rgba(212,175,55,0.05)_55%,transparent_70%)] blur-xl" />
+                  <div className="pointer-events-none absolute -inset-6 rounded-full bg-[radial-gradient(circle,rgba(244,208,63,0.15)_0%,rgba(212,175,55,0.05)_55%,transparent_70%)] blur-xl dark:hidden" />
                   <AppIcon size="lg" />
                 </div>
 
@@ -512,7 +512,7 @@ export default function HomePage() {
         </section>
 
         {/* Section 7: Final CTA */}
-        <section className="w-full max-w-4xl py-16 my-8 rounded-3xl border border-primary/40 bg-[radial-gradient(ellipse_at_center,rgba(212,175,55,0.14)_0%,rgba(255,255,255,0.9)_70%)] dark:bg-[radial-gradient(ellipse_at_center,rgba(244,187,68,0.12)_0%,transparent_70%)] shadow-[0_10px_40px_rgba(212,175,55,0.08)] p-8 sm:p-14 text-center">
+        <section className="w-full max-w-4xl py-16 my-8 rounded-3xl p-8 sm:p-14 text-center">
           <h2 className="text-3xl font-extrabold tracking-tight text-foreground sm:text-5xl mb-4">
             Ready to join?
           </h2>
@@ -523,7 +523,7 @@ export default function HomePage() {
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
             <Link
               href={appUrl}
-              className="inline-flex h-12 w-full sm:w-auto items-center justify-center gap-2 rounded-xl bg-primary px-8 text-sm font-semibold text-primary-foreground shadow-[0_0_20px_rgba(212,175,55,0.4)] transition-all duration-200 hover:shadow-[0_0_28px_rgba(212,175,55,0.6)] hover:brightness-105 active:scale-95 cursor-pointer"
+              className="inline-flex h-12 w-full sm:w-auto items-center justify-center gap-2 rounded-xl bg-primary px-8 text-sm font-semibold text-primary-foreground transition-all duration-200 hover:brightness-105 active:scale-95 cursor-pointer"
             >
               {user ? "Open App" : "Get Started"}
             </Link>

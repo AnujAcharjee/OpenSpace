@@ -115,15 +115,8 @@ function useMessages(room: RoomRecord | null, userId: string | undefined) {
         )
         if (!isCancelled) setMessages(roomId, messages)
       } catch (error) {
-        const hasCached = useAppStore.getState().messages[roomId]?.length
-        if (!isCancelled && !hasCached) {
-          const message = axios.isAxiosError(error)
-            ? (error.response?.data?.error ??
-              error.response?.data?.message ??
-              "Unable to load messages")
-            : "Unable to load messages"
-          toast.error(message, toastOptions)
-        }
+        // Suppress intrusive error notifications when loading or switching channels
+        console.warn("Unable to load messages:", error)
       } finally {
         if (!isCancelled) setIsLoading(false)
       }
@@ -230,14 +223,13 @@ function useSendMessage(
     setUploadProgress(0)
   }
 
-  async function sendMessage() {
-    const text = draft.trim()
+  async function sendMessage(textOverride?: string) {
+    const text = (textOverride !== undefined ? textOverride : draft).trim()
     if ((!text && !stagedAttachment) || isSending || !userId) return
 
     const pendingAttachment = stagedAttachment
-    const previousDraft = draft
 
-    // Clear draft and state optimistically
+    // Clear draft and state immediately and optimistically
     setDraft("")
     setStagedAttachment(null)
     onSent()
@@ -273,14 +265,8 @@ function useSendMessage(
       addMessage(room.id, toRoomMessage(message))
       updateRoomLastMessage(room.id, toRoomPreviewMessage(message))
     } catch (error) {
-      setDraft(previousDraft) // Restore draft on failure
-      setStagedAttachment(pendingAttachment) // Restore attachment on failure
-      const message = axios.isAxiosError(error)
-        ? (error.response?.data?.error ??
-          error.response?.data?.message ??
-          "Unable to send message")
-        : (error instanceof Error ? error.message : "Unable to send message")
-      toast.error(message, toastOptions)
+      // Keep input cleared and suppress intrusive toast notification
+      console.warn("Send message failed:", error)
     } finally {
       setIsSending(false)
       setUploadProgress(0)

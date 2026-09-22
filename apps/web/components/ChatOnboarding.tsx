@@ -206,7 +206,7 @@ export function ChatOnboarding({ user }: ChatOnboardingProps) {
       {/* showCloseButton defaults to true in DialogContent, providing single clean X button */}
       <DialogContent className="sm:max-w-md p-0 overflow-hidden border border-border/60 bg-card/95 shadow-2xl backdrop-blur-xl rounded-2xl">
         {/* Header Visual Banner */}
-        <div className="relative flex flex-col items-center justify-center p-6 bg-[radial-gradient(ellipse_at_top,rgba(244,187,68,0.18)_0%,transparent_70%)] border-b border-border/40">
+        <div className="relative flex flex-col items-center justify-center p-6 bg-[radial-gradient(ellipse_at_top,rgba(244,187,68,0.18)_0%,transparent_70%)] dark:bg-none border-b border-border/40">
           <div className="relative mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 border border-primary/25 shadow-md">
             <IconComponent size={28} className="text-primary animate-in zoom-in-50 duration-200" />
           </div>

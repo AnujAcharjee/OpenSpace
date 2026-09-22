@@ -242,7 +242,7 @@ export default function ChatSection({
           <Card className="flex h-full w-full flex-col items-center justify-center border border-border/40 bg-card/40 backdrop-blur-md rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.03)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.15)] p-6 text-center">
             <div className="flex flex-col items-center max-w-md space-y-6">
               <div className="relative flex items-center justify-center py-4">
-                <div className="pointer-events-none absolute -inset-6 rounded-full bg-[radial-gradient(circle,rgba(244,208,63,0.15)_0%,rgba(212,175,55,0.05)_55%,transparent_70%)] blur-2xl" />
+                <div className="pointer-events-none absolute -inset-6 rounded-full bg-[radial-gradient(circle,rgba(244,208,63,0.15)_0%,rgba(212,175,55,0.05)_55%,transparent_70%)] blur-2xl dark:hidden" />
                 <AppIcon size="lg" />
               </div>
 
@@ -258,7 +258,7 @@ export default function ChatSection({
               <div className="flex flex-col sm:flex-row items-center gap-3 w-full justify-center">
                 <Button
                   size="lg"
-                  className="w-full sm:w-auto h-11 px-8 rounded-xl font-semibold shadow-[0_0_20px_rgba(244,187,68,0.25)] hover:shadow-[0_0_25px_rgba(244,187,68,0.45)] cursor-pointer"
+                  className="w-full sm:w-auto h-11 px-8 rounded-xl font-semibold shadow-[0_0_20px_rgba(244,187,68,0.25)] dark:shadow-none hover:shadow-[0_0_25px_rgba(244,187,68,0.45)] dark:hover:shadow-none cursor-pointer"
                   onClick={() => router.push("/signin")}
                 >
                   Sign in
@@ -299,7 +299,7 @@ export default function ChatSection({
         <Card className="flex h-full w-full flex-col items-center justify-center border border-border/40 bg-card/40 backdrop-blur-md rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.03)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.15)] p-6 text-center">
           <div className="flex flex-col items-center max-w-sm space-y-4">
             <div className="relative flex items-center justify-center py-2">
-              <div className="pointer-events-none absolute -inset-6 rounded-full bg-[radial-gradient(circle,rgba(244,208,63,0.10)_0%,rgba(212,175,55,0.03)_55%,transparent_70%)] blur-xl" />
+              <div className="pointer-events-none absolute -inset-6 rounded-full bg-[radial-gradient(circle,rgba(244,208,63,0.10)_0%,rgba(212,175,55,0.03)_55%,transparent_70%)] blur-xl dark:hidden" />
               <AppIcon size="lg" />
             </div>
 
@@ -575,7 +575,12 @@ export default function ChatSection({
                 className="flex w-full max-w-xl mx-auto items-end gap-2"
                 onSubmit={(e) => {
                   e.preventDefault()
-                  void sendMessage()
+                  if (!draft.trim() && !stagedAttachment) return
+                  if (isSending) return
+                  const textToSend = draft
+                  setDraft("")
+                  if (inputRef.current) inputRef.current.value = ""
+                  void sendMessage(textToSend)
                 }}
               >
                 <div className="relative flex flex-1 flex-col gap-1.5">
@@ -694,6 +699,17 @@ export default function ChatSection({
                       ref={inputRef}
                       value={draft}
                       onChange={(e) => setDraft(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault()
+                          if (!isSending && (draft.trim() || stagedAttachment)) {
+                            const textToSend = draft
+                            setDraft("")
+                            if (inputRef.current) inputRef.current.value = ""
+                            void sendMessage(textToSend)
+                          }
+                        }
+                      }}
                       onPaste={handlePaste}
                       placeholder={
                         !user
