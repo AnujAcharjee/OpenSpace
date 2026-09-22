@@ -1,6 +1,6 @@
 This favicon was generated using the following font:
 
-- Font Title: Labrada
+- Font Title: Leckerli One
 - Font Author: undefined
-- Font Source: https://fonts.gstatic.com/s/labrada/v4/ieVv2Y9HLWefIpOyPVxQIkLq2VfhwMCbCAx8SvN2fy17-dE.ttf
+- Font Source: https://fonts.gstatic.com/s/leckerlione/v22/V8mCoQH8VCsNttEnxnGQ-1itLZxcBtItFw.ttf
 - Font License: undefined)

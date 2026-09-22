@@ -16,23 +16,71 @@ const fontMono = Geist_Mono({
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://openspace.anujacharjee.com"),
-  title: "OpenSpace — Discover Conversations & Communities",
+  title: {
+    default: "OpenSpace — Discover Conversations & Communities",
+    template: "%s | OpenSpace",
+  },
   description:
-    "Discover public channels, join conversations around the topics you care about, and connect with people from around the world — through text, voice, and video.",
+    "A real-time social platform to discover channels, join conversations, and connect with people worldwide through text, voice, and video.",
+  keywords: [
+    "OpenSpace",
+    "real-time chat",
+    "community channels",
+    "group messaging",
+    "chat app",
+    "voice channels",
+    "social platform",
+    "instant messaging",
+    "public channels",
+    "private channels",
+  ],
+  authors: [{ name: "Anuj Acharjee", url: "https://anujacharjee.com" }],
+  creator: "Anuj Acharjee",
+  publisher: "OpenSpace",
+  alternates: {
+    canonical: "https://openspace.anujacharjee.com",
+  },
 
-  // Open Graph — controls how link looks
+  // Open Graph — social media previews (WhatsApp, Facebook, LinkedIn)
   openGraph: {
     title: "OpenSpace — Discover Conversations & Communities",
     description:
-      "Discover public channels, join conversations around the topics you care about, and connect with people from around the world — through text, voice, and video.",
+      "A real-time social platform to discover channels, join conversations, and connect with people worldwide through text, voice, and video.",
     url: "https://openspace.anujacharjee.com",
+    siteName: "OpenSpace",
+    locale: "en_US",
+    type: "website",
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1200,
+        height: 675,
+        alt: "OpenSpace — Discover Conversations & Communities",
+      },
+    ],
+  },
+
+  // Twitter / X cards
+  twitter: {
+    card: "summary_large_image",
+    title: "OpenSpace — Discover Conversations & Communities",
+    description:
+      "A real-time social platform to discover channels, join conversations, and connect with people worldwide through text, voice, and video.",
     images: ["/og-image.png"],
+    creator: "@AnujAcharjee",
   },
 
   // Controls search engine crawling
   robots: {
     index: true,
     follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
   },
 
   icons: {
@@ -46,6 +94,38 @@ export const metadata: Metadata = {
       { rel: "icon", url: "/logo/favicon-192x192.png", sizes: "192x192" },
     ],
   },
+}
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "@id": "https://openspace.anujacharjee.com/#website",
+      url: "https://openspace.anujacharjee.com",
+      name: "OpenSpace",
+      description:
+        "A real-time social platform to discover channels, join conversations, and connect with people worldwide.",
+      publisher: {
+        "@type": "Person",
+        name: "Anuj Acharjee",
+        url: "https://anujacharjee.com",
+      },
+    },
+    {
+      "@type": "SoftwareApplication",
+      "@id": "https://openspace.anujacharjee.com/#application",
+      name: "OpenSpace",
+      applicationCategory: "CommunicationApplication",
+      operatingSystem: "All",
+      browserRequirements: "Requires JavaScript. Requires HTML5.",
+      offers: {
+        "@type": "Offer",
+        price: "0",
+        priceCurrency: "USD",
+      },
+    },
+  ],
 }
 
 export default function RootLayout({
@@ -64,6 +144,12 @@ export default function RootLayout({
         raleway.variable
       )}
     >
+      <head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+      </head>
       <body className="flex min-h-screen items-center justify-center bg-background">
         <ThemeProvider>
           <TooltipProvider>{children}</TooltipProvider>
