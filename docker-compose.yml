@@ -10,7 +10,7 @@ services:
   caddy:
     <<: *default-logging
     image: caddy:2-alpine
-    container_name: collab_caddy
+    container_name: openspace_caddy
     restart: unless-stopped
     ports:
       - "80:80"
@@ -26,7 +26,7 @@ services:
     depends_on:
       - api-gateway
     networks:
-      - collab_net
+      - openspace_net
 
   # ─── API Gateway Service (:3005) ───────────────────────────────────────────
   api-gateway:
@@ -37,7 +37,7 @@ services:
       dockerfile: Dockerfile
       args:
         APP_NAME: api-gateway
-    container_name: collab_api_gateway
+    container_name: openspace_api_gateway
     restart: unless-stopped
     environment:
       - NODE_ENV=production
@@ -49,7 +49,7 @@ services:
       - JWT_SECRET=${JWT_SECRET}
       - WEB_APP_URL=${WEB_APP_URL}
       - GATEWAY_INTERNAL_SECRET=${GATEWAY_INTERNAL_SECRET}
-      - ACCESS_TOKEN_COOKIE_NAME=${ACCESS_TOKEN_COOKIE_NAME:-collab_token}
+      - ACCESS_TOKEN_COOKIE_NAME=${ACCESS_TOKEN_COOKIE_NAME:-accessToken}
       - COOKIE_DOMAIN=${COOKIE_DOMAIN:-}
       - COOKIE_SAME_SITE=${COOKIE_SAME_SITE:-lax}
       - PRAMAAN_CLIENT_ID=${PRAMAAN_CLIENT_ID}
@@ -59,7 +59,7 @@ services:
       - chat-service
       - ws-service
     networks:
-      - collab_net
+      - openspace_net
 
   # ─── HTTP Service (:3001) ──────────────────────────────────────────────────
   http-service:
@@ -70,7 +70,7 @@ services:
       dockerfile: Dockerfile
       args:
         APP_NAME: http-service
-    container_name: collab_http_service
+    container_name: openspace_http_service
     restart: unless-stopped
     environment:
       - NODE_ENV=production
@@ -80,7 +80,7 @@ services:
       - JWT_SECRET=${JWT_SECRET}
       - WEB_APP_URL=${WEB_APP_URL}
       - GATEWAY_INTERNAL_SECRET=${GATEWAY_INTERNAL_SECRET}
-      - ACCESS_TOKEN_COOKIE_NAME=${ACCESS_TOKEN_COOKIE_NAME:-collab_token}
+      - ACCESS_TOKEN_COOKIE_NAME=${ACCESS_TOKEN_COOKIE_NAME:-accessToken}
       - COOKIE_DOMAIN=${COOKIE_DOMAIN:-}
       - COOKIE_SAME_SITE=${COOKIE_SAME_SITE:-lax}
       - PRAMAAN_CLIENT_ID=${PRAMAAN_CLIENT_ID}
@@ -88,7 +88,7 @@ services:
       - CALLBACK_URL=${CALLBACK_URL}
       - PRAMAAN_SERVER_URL=${PRAMAAN_SERVER_URL}
     networks:
-      - collab_net
+      - openspace_net
 
   # ─── Chat Service & StreamWorker (:3000) ───────────────────────────────────
   chat-service:
@@ -99,7 +99,7 @@ services:
       dockerfile: Dockerfile
       args:
         APP_NAME: chat-service
-    container_name: collab_chat_service
+    container_name: openspace_chat_service
     restart: unless-stopped
     environment:
       - NODE_ENV=production
@@ -108,7 +108,7 @@ services:
       - REDIS_URL=${REDIS_URL}
       - GATEWAY_INTERNAL_SECRET=${GATEWAY_INTERNAL_SECRET}
     networks:
-      - collab_net
+      - openspace_net
 
   # ─── WebSocket Service (:3002) ─────────────────────────────────────────────
   ws-service:
@@ -119,7 +119,7 @@ services:
       dockerfile: Dockerfile
       args:
         APP_NAME: ws-service
-    container_name: collab_ws_service
+    container_name: openspace_ws_service
     restart: unless-stopped
     environment:
       - NODE_ENV=production
@@ -128,10 +128,10 @@ services:
       - REDIS_URL=${REDIS_URL}
       - GATEWAY_INTERNAL_SECRET=${GATEWAY_INTERNAL_SECRET}
     networks:
-      - collab_net
+      - openspace_net
 
 networks:
-  collab_net:
+  openspace_net:
     driver: bridge
 
 volumes:

@@ -160,16 +160,22 @@ jobs:
             CALLBACK_URL=${{ secrets.CALLBACK_URL || 'https://api.openspace.anujacharjee.com/api/v1/auth/pramaan/callback' }}
             EOF
 
-            # 1. Login to Docker Hub (if private repo)
+            # 1. Stop any running legacy Collab stack and remove conflicting old containers
+            if [ -d "$HOME/Collab" ]; then
+              (cd "$HOME/Collab" && docker compose down 2>/dev/null) || true
+            fi
+            docker rm -f collab_caddy collab_api_gateway collab_http_service collab_chat_service collab_ws_service openspace_caddy openspace_api_gateway openspace_http_service openspace_chat_service openspace_ws_service 2>/dev/null || true
+
+            # 2. Login to Docker Hub (if private repo)
             if [ -n "${{ secrets.DOCKERHUB_TOKEN }}" ]; then
               echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME || 'anuj304' }}" --password-stdin
             fi
 
-            # 2. Pull latest images from Docker Hub in seconds
+            # 3. Pull latest images from Docker Hub in seconds
             docker compose pull
 
-            # 3. Recreate containers using pre-built images with zero build overhead
+            # 4. Recreate containers using pre-built images with zero build overhead
             docker compose up -d --remove-orphans
 
-            # 4. Clean untagged dangling images after deployment
+            # 5. Clean untagged dangling images after deployment
             docker image prune -f || true
