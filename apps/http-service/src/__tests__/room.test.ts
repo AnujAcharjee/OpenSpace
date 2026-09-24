@@ -18,6 +18,7 @@ const { mockRedis, mockPrisma } = vi.hoisted(() => ({
       findFirst: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
+      count: vi.fn().mockResolvedValue(1),
     },
     chatRoomMember: {
       findUnique: vi.fn(),
@@ -146,7 +147,8 @@ describe('HTTP Service - Room Search & Join', () => {
         orderBy: {
           updatedAt: 'desc',
         },
-        take: 50,
+        skip: 0,
+        take: 10,
       });
 
       expect(res.status).toHaveBeenCalledWith(200);
@@ -186,7 +188,8 @@ describe('HTTP Service - Room Search & Join', () => {
         orderBy: {
           updatedAt: 'desc',
         },
-        take: 50,
+        skip: 0,
+        take: 10,
       });
 
       expect(res.status).toHaveBeenCalledWith(200);

@@ -66,6 +66,7 @@ const roomBodySchema = createRoomSchema.shape.body
 const createRoomFormSchema = z.object({
   name: roomBodySchema.shape.name,
   description: roomBodySchema.shape.description,
+  topics: z.array(z.string()).default([]),
   isPrivate: z.enum(["false", "true"]),
 })
 
@@ -806,6 +807,7 @@ function DialogCreateRoom({ creatorId }: { creatorId: string }) {
   const defaultCreateRoomValues: CreateRoomFormInput = {
     name: "",
     description: "",
+    topics: [],
     isPrivate: "false",
   }
 

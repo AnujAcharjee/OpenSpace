@@ -5,7 +5,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack -p 3004",
-    "build": "next build",
+    "prebuild": "pnpm --filter @repo/validation build",
+    "build": "pnpm --filter @repo/validation build && next build",
     "start": "next start -p 3004",
     "lint": "eslint",
     "format": "prettier --write \"**/*.{ts,tsx}\"",
