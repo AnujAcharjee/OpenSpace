@@ -55,6 +55,7 @@ export function toRoomRecord(
     name: room.name,
     description: room.description ?? null,
     avatarUrl: room.avatarUrl ?? null,
+    topics: room.topics ?? [],
     isPrivate: room.isPrivate,
     creatorId: room.creatorId ?? null,
     createdAt: room.createdAt?.toISOString() ?? new Date(0).toISOString(),

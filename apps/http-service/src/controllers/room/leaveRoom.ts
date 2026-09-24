@@ -1,7 +1,7 @@
 import type { Request, Response } from 'express';
 import type { LeaveRoomRequest as LeaveRoomInput } from '@repo/validation';
 import { v4 as uuidv4 } from 'uuid';
-import { prisma } from '@repo/db';
+import { MessageType, prisma } from '@repo/db';
 import { logger } from '../../lib/logger.js';
 import { redis } from '../../lib/redis.js';
 import { toRoomRecord } from '../@helpers.js';
@@ -54,7 +54,25 @@ export const leaveRoom = async (req: Request, res: Response) => {
     },
   });
 
-  const username = existingMember.user?.username ?? 'A user';
+  const rawUsername = existingMember.user?.username || existingMember.user?.name || 'A user';
+  const username = rawUsername.startsWith('@') ? rawUsername.slice(1) : rawUsername;
+  const systemMessageId = uuidv4();
+  const systemMessageText = `@${username} left the room`;
+
+  try {
+    await prisma.chatMessage.create({
+      data: {
+        id: systemMessageId,
+        roomId,
+        userId,
+        type: MessageType.SYSTEM,
+        text: systemMessageText,
+        updatedAt: new Date(),
+      },
+    });
+  } catch (dbError) {
+    logger.error({ dbError, roomId, userId }, 'Failed to persist leave room system message');
+  }
 
   try {
     // 1. Notify remaining room members via room channel
@@ -63,11 +81,13 @@ export const leaveRoom = async (req: Request, res: Response) => {
       JSON.stringify({
         type: 'chat_message',
         payload: {
-          id: uuidv4(),
-          sender: 'SYSTEM',
-          senderUsername: 'SYSTEM',
-          text: `${username} left the room`,
+          id: systemMessageId,
+          sender: userId,
+          senderUsername: username,
+          senderAvatarUrl: existingMember.user?.avatarUrl ?? null,
+          text: systemMessageText,
           roomId,
+          type: 'SYSTEM',
           createdAt: new Date().toISOString(),
         },
       }),

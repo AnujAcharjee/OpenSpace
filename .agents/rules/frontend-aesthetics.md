@@ -1,11 +1,11 @@
 ---
 trigger: always_on
-description: Core aesthetic guidelines, visual direction, color system, typography, and anti-slop rules for the illustrated stationery chat interface in project/apps/web-2.
+description: Core aesthetic guidelines, visual direction, color system, typography, component specifications, and anti-slop rules for the illustrated stationery chat interface in project/apps/web2.0.
 ---
 
 # Frontend Aesthetics: Illustrated Stationery & Colored-Pencil Chat
 
-This document defines the visual design system, color language, typography, and styling rules for `project/apps/web-2`.
+This document defines the visual design system, color language, typography, and styling rules for `project/apps/web2.0`.
 
 ---
 
@@ -40,16 +40,20 @@ Use a warm, tactile paper base rather than sterile digital `#FFFFFF` or cold `#0
 * **Charcoal & Walnut Ink**: Primary text, crisp line work, active borders
 * **Graphite & Soft Ink**: Secondary labels, timestamps, subtle dividers
 
+### Card Contour & Golden Border Rules
+* **Light Mode**: Thin, delicate golden contour border (`border-[#d4a03d]/40` or subtle 1px sand accent) on primary workspace desk cards (`Channels` and `ChatSection`).
+* **Dark Mode**: Reverts strictly to standard muted contour (`border-line`). **Never** display golden borders in dark mode.
+
 ### Desaturated Colored-Pencil Accents
 Accent colors must feel like physical colored pencils gently applied to paper:
 * **Dusty Teal (`--pencil-teal`)**: Highlights, selected channel markers, active tags
 * **Muted Coral (`--pencil-coral`)**: Alerts, notifications, important badges
-* **Mustard Yellow (`--pencil-yellow`)**: Mentions, stars, pinned markers
-* **Sage Green (`--pencil-green`)**: Online presence indicators, success feedback
+* **Mustard Yellow (`--pencil-yellow`)**: Mentions, stars, pinned markers, "Discuss" category
+* **Sage Green (`--pencil-green`)**: Online presence indicators, success feedback, "Explore" category
 * **Faded Orange (`--pencil-orange`)**: System notices, unread indicators
-* **Muted Slate Blue (`--pencil-blue`)**: Links, code block highlights
+* **Muted Slate Blue (`--pencil-blue`)**: Links, code block highlights, "Create" category
 
-### CSS Variables Specification (`index.css` / Tailwind Tokens)
+### CSS Variables Specification (`globals.css` / Tailwind Tokens)
 ```css
 :root {
   /* Paper Surfaces */
@@ -135,28 +139,55 @@ Do **NOT** use generic default sans-serif fonts (Inter, Arial, Roboto).
 
 ### 4.2 Sidebar & Channel Navigation
 * Warm paper column with an intentional, thin ink divider.
-* **Channels**: Prefixed with hand-drawn hashtag/circle sketch icons.
+* **Search Bar**: Full-width across the top of the sidebar.
+* **Thin Action Buttons**: Directly below the search bar, two thin, text-only buttons side-by-side (`h-[22px]`, `py-0`, `text-[11px]`):
+  - **Explore**: Green accent (`--pencil-green`), text-only, **no icon**. Switches chat section to Explore Channels view.
+  - **Create**: Blue accent (`--pencil-blue`), text-only, **no icon** and **no `+` prefix**. Opens the Create Channel dialog.
+* **No Orphaned Buttons**: Dialog triggers must only be rendered when explicitly passed via `trigger` prop to avoid phantom/misplaced buttons.
+* **Channels**: Prefixed with hand-drawn hashtag sketch icons.
 * **Active Channel**: Highlighted as if gently marked with a colored-pencil highlighter (soft pastel tint background with a visible, confident pencil mark).
 * **Unread Indicators**: Small hand-drawn coral pencil dots.
 
-### 4.3 Header
+### 4.3 Explore Channels (Master-Detail in Chat Space)
+* Renders strictly inside the chat pane (replaces empty/chat view while exploring).
+* **LHS (List Column)**:
+  - Search box and scrollable topic filter pills (`All`, `Technology`, `Design`, `Gaming`, `Music`, `Crypto`, `Dev`, `Art`, `Science`, `News`, `Books`, `Lifestyle`).
+  - Channel list showing avatar (`avi`), name (`#channel-name` with lock if private), and topic tags (`#Tech`, `#Design`).
+  - Active selection highlighted with pencil border and tactile lift.
+  - **Slow / Paginated Loading**: Backend fetches channels in small chunks (10 per batch with `limit` and `page`), appending upon scrolling down or clicking "Load more channels". Never fetch all channels at once.
+* **RHS (Detail Preview Column)**:
+  - Full channel preview card: large avatar banner, name, visibility badge, creation date, full topic tags list, description block, members preview, and Join/Open action button.
+  - Header: Text-only `"Explore Channels"` without count numbers or compass icon.
+* **Responsive Collapsing**: On small screens, LHS is visible by default; selecting a channel shows the RHS detail with a `"← Back to channels list"` button.
+
+### 4.4 Channel Creation & Multi-Topic System
+* Channels support multiple topics (`topics: string[]`).
+* Dialog includes an interactive multi-topic chip selector with checkmarked active states.
+* Submit payload sends `{ name, description, isPrivate, topics: selectedTopics, avatarUrl }`.
+* Creation buttons must be text-only (`Create`), without `+` icons or prefixes.
+
+### 4.5 Settings & Profile View
+* Settings dialog opens to a static, read-only **Profile** view by default (showing avatar, name, username, bio, and role).
+* An "Edit Profile" button with a pencil icon below the avatar switches into the edit form.
+
+### 4.6 Header
 * Slim stationery letterhead treatment with room title in editorial display typography.
 * Subtle hand-drawn member count indicator (e.g., tiny illustrated group icon).
 * Action buttons (Search, Call, Info) rendered as clean ink icons inside subtly rounded paper frames.
 
-### 4.4 Message Composer
+### 4.7 Message Composer
 * Styled like a premium piece of stationery or a draftsman's desk pad.
 * Soft paper surface, crisp 1.5px ink outline with slight organic curvature.
 * Send button: Solid colored-pencil fill (teal or coral) with tactile press feedback (`active:translate-y-0.5`).
 * Action buttons (attachments, emoji, audio): Small, hand-drawn outline icons that illuminate with pencil color upon hover.
 
-### 4.5 Avatars & Presences
+### 4.8 Avatars & Presences
 * Existing user avatar photos rendered inside slightly organic pencil-drawn frames (not sterile geometric circles).
 * When initials fallback is displayed, use warm parchment tones with hand-lettered styled initials.
 * Presence dot: Hand-drawn filled watercolor/pencil circle (sage green for online, muted graphite for offline).
 
-### 4.6 Empty & Loading States
-* **Empty Chat**: A delicate, minimal line illustration (e.g., an open sketchbook, a coffee cup, or an ink pen resting on a desk) accompanied by a thoughtful, concise handwritten greeting.
+### 4.9 Empty & Loading States
+* **Empty Chat**: A delicate, minimal line illustration accompanied by a thoughtful greeting and quick-action cards (Discover Channels, Create Channel).
 * **Loading State**: Subtle pencil-sketch pulse or drawing animation rather than harsh gray generic skeleton boxes.
 
 ---
@@ -172,12 +203,17 @@ Do **NOT** use generic default sans-serif fonts (Inter, Arial, Roboto).
 
 ## 6. Strict Anti-Slop Checklist
 
-Before accepting any component in `project/apps/web-2`, verify that NONE of the following anti-patterns are present:
+Before accepting any component in `project/apps/web2.0`, verify that NONE of the following anti-patterns are present:
 - [ ] No Inter font default.
 - [ ] No purple-to-pink AI gradient backgrounds.
 - [ ] No glassy/frosted blur overlays (glassmorphism).
 - [ ] No generic Lucide icons used without styled sizing and stroke weight matching the ink aesthetic.
 - [ ] No blinding pure white `#FFFFFF` canvases without warm paper grounding.
+- [ ] No golden borders in dark mode (light mode only).
+- [ ] No icons on Explore and Create sidebar navigation buttons (must remain text-only `h-[22px]`).
+- [ ] No `+` prefix or plus icon on the Create button.
+- [ ] No channel count badges in Explore Channels header.
+- [ ] No unpaginated / bulk fetching of all channels at once (must paginate with `limit: 10`).
 - [ ] No pixel art, 8-bit graphics, or noisy comic-book halftones.
 - [ ] No giant hero 3D blobs or floating isometric cards.
 - [ ] No broken typography contrast (ensure all text passes WCAG AA readability on paper surfaces).

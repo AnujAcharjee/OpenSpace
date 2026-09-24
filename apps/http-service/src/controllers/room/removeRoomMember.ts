@@ -1,7 +1,7 @@
 import type { Request, Response } from 'express';
 import type { RemoveRoomMemberRequest as RemoveRoomMemberInput } from '@repo/validation';
 import { v4 as uuidv4 } from 'uuid';
-import { prisma, Prisma } from '@repo/db';
+import { MessageType, prisma, Prisma } from '@repo/db';
 import { logger } from '../../lib/logger.js';
 import { redis } from '../../lib/redis.js';
 import { toRoomRecord } from '../@helpers.js';
@@ -56,7 +56,25 @@ export const removeRoomMember = async (req: Request, res: Response) => {
   }
 
   if (removedMember) {
-    const removedUsername = removedMember.user?.username ?? 'A user';
+    const rawUsername = removedMember.user?.username || removedMember.user?.name || 'A user';
+    const removedUsername = rawUsername.startsWith('@') ? rawUsername.slice(1) : rawUsername;
+    const systemMessageId = uuidv4();
+    const systemMessageText = `@${removedUsername} was removed from the room`;
+
+    try {
+      await prisma.chatMessage.create({
+        data: {
+          id: systemMessageId,
+          roomId,
+          userId: removedMember.userId,
+          type: MessageType.SYSTEM,
+          text: systemMessageText,
+          updatedAt: new Date(),
+        },
+      });
+    } catch (dbError) {
+      logger.error({ dbError, roomId, memberId }, 'Failed to persist remove member system message');
+    }
 
     try {
       // 1. Notify remaining room members via room-scoped channel
@@ -65,10 +83,13 @@ export const removeRoomMember = async (req: Request, res: Response) => {
         JSON.stringify({
           type: 'chat_message',
           payload: {
-            id: uuidv4(),
+            id: systemMessageId,
             sender: removedMember.userId,
-            text: `${removedUsername} was removed from the room`,
+            senderUsername: removedUsername,
+            senderAvatarUrl: removedMember.user?.avatarUrl ?? null,
+            text: systemMessageText,
             roomId,
+            type: 'SYSTEM',
             createdAt: new Date().toISOString(),
           },
         }),

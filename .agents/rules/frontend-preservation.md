@@ -1,6 +1,6 @@
 ---
 trigger: always_on
-description: Mandatory preservation rules ensuring 100% functional, architectural, API, and state parity when building or redesigning the frontend (web-2).
+description: Mandatory preservation rules ensuring 100% functional, architectural, API, and state parity when building or redesigning the frontend (web2.0).
 ---
 
 # Frontend Functional Preservation Rules
@@ -12,7 +12,7 @@ description: Mandatory preservation rules ensuring 100% functional, architectura
 
 ## 1. Absolute Behavioral Invariants
 
-When creating, refactoring, or building components in `project/apps/web-2`:
+When creating, refactoring, or building components in `project/apps/web2.0`:
 
 1. **Zero Backend / API Changes**:
    - Preserve all existing API endpoints, HTTP methods, headers, and request/response payloads.
@@ -51,7 +51,7 @@ When creating, refactoring, or building components in `project/apps/web-2`:
 
 ## 2. Pre-Redesign Inspection Checklist
 
-Before writing any new component or screen in `project/apps/web-2`:
+Before writing any new component or screen in `project/apps/web2.0`:
 - [ ] Inspect the corresponding component in `project/apps/web`.
 - [ ] List all props, state hooks, and custom hooks (`useAppStore`, `useChatSocket`, etc.).
 - [ ] Identify all network requests triggered (fetching messages, creating rooms, reactions, uploads).

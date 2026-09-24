@@ -41,6 +41,7 @@ export const createRoom = async (req: Request, res: Response) => {
         name: data.name.trim(),
         description: data.description ?? null,
         avatarUrl: data.avatarUrl ?? null,
+        topics: data.topics ?? [],
         isPrivate: data.isPrivate,
         creatorId,
         updatedAt: new Date(),

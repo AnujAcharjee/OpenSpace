@@ -21,6 +21,7 @@ export const createRoomSchema = z.object({
     name: roomNameSchema,
     description: roomDescriptionSchema.optional(),
     avatarUrl: z.string().nullable().optional(),
+    topics: z.array(z.string().trim().min(1)).default([]),
     isPrivate: z.boolean({ message: 'isPrivate must be a boolean' }),
     creatorId: uuidSchema('creatorId must be a valid UUID').optional(),
   }),
@@ -33,6 +34,7 @@ const editRoomBodySchema = z
     name: roomNameSchema.optional(),
     description: roomDescriptionSchema.optional(),
     avatarUrl: z.string().nullable().optional(),
+    topics: z.array(z.string().trim().min(1)).optional(),
     isPrivate: z.boolean({ message: 'isPrivate must be a boolean' }).optional(),
   })
   .superRefine((body, ctx) => {
@@ -40,6 +42,7 @@ const editRoomBodySchema = z
       body.name === undefined &&
       body.description === undefined &&
       body.avatarUrl === undefined &&
+      body.topics === undefined &&
       body.isPrivate === undefined
     ) {
       ctx.addIssue({
@@ -82,6 +85,13 @@ export const searchRoomsSchema = z.object({
       .max(100, { message: 'name must be at most 100 characters' })
       .optional()
       .default(''),
+    topic: z
+      .string({ message: 'topic must be a string' })
+      .trim()
+      .max(50, { message: 'topic must be at most 50 characters' })
+      .optional(),
+    page: z.coerce.number().int().min(1).optional().default(1),
+    limit: z.coerce.number().int().min(1).max(50).optional().default(10),
   }),
 });
 
@@ -194,6 +204,7 @@ export const roomResponseSchema = z.object({
   name: z.string().min(1).max(100),
   description: z.string().nullable(),
   avatarUrl: z.string().nullable().optional(),
+  topics: z.array(z.string()).default([]),
   isPrivate: z.boolean(),
   creatorId: uuidSchema('creatorId must be a valid UUID').nullable(),
   createdAt: isoDatetimeSchema('createdAt must be a valid ISO datetime'),

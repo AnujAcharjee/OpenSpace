@@ -31,6 +31,7 @@ export const editRoom = async (req: Request, res: Response) => {
         ...(data.name !== undefined && { name: data.name.trim() }),
         ...(data.description !== undefined && { description: data.description }),
         ...(data.avatarUrl !== undefined && { avatarUrl: data.avatarUrl }),
+        ...(data.topics !== undefined && { topics: data.topics }),
         ...(data.isPrivate !== undefined && { isPrivate: data.isPrivate }),
         updatedAt: new Date(),
       },
