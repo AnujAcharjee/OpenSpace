@@ -20,8 +20,8 @@ RUN pnpm install --frozen-lockfile
 # Generate Prisma Client singleton
 RUN pnpm --filter @repo/db exec prisma generate
 
-# Build all backend TypeScript packages & microservices (skipping web)
-RUN pnpm turbo run build --filter=!web
+# Build all backend TypeScript packages & microservices (skipping web & web2.0)
+RUN pnpm turbo run build --filter=!web --filter=!web2.0
 
 # ─── Stage 3: Production Runner ──────────────────────────────────────────────
 FROM base AS runner

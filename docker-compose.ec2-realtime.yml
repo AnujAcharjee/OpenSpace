@@ -1,0 +1,47 @@
+x-logging: &default-logging
+  logging:
+    driver: "json-file"
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+services:
+  # ─── Chat Ingestion Service & StreamWorker (:3000) ─────────────────────────
+  chat-service:
+    <<: *default-logging
+    image: anuj304/openspace:chat-service
+    container_name: openspace_chat_service
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+      - WEB_APP_URL=${WEB_APP_URL}
+      - GATEWAY_INTERNAL_SECRET=${GATEWAY_INTERNAL_SECRET}
+    networks:
+      - openspace_realtime_net
+
+  # ─── Realtime WebSocket Service (:3002) ────────────────────────────────────
+  ws-service:
+    <<: *default-logging
+    image: anuj304/openspace:ws-service
+    container_name: openspace_ws_service
+    restart: unless-stopped
+    ports:
+      - "3002:3002"
+    environment:
+      - NODE_ENV=production
+      - PORT=3002
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+      - GATEWAY_INTERNAL_SECRET=${GATEWAY_INTERNAL_SECRET}
+      - INSTANCE_NAME=${INSTANCE_NAME:-ws-node-1}
+    networks:
+      - openspace_realtime_net
+
+networks:
+  openspace_realtime_net:
+    driver: bridge

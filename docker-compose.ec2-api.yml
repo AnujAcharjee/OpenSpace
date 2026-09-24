@@ -1,0 +1,93 @@
+x-logging: &default-logging
+  logging:
+    driver: "json-file"
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+services:
+  # ─── Caddy Reverse Proxy & Automatic SSL (:80, :443) ────────────────────────
+  caddy:
+    <<: *default-logging
+    image: caddy:2-alpine
+    container_name: openspace_caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      - API_DOMAIN=${API_DOMAIN:-localhost}
+      - ACME_EMAIL=${ACME_EMAIL:-admin@example.com}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api-gateway
+    networks:
+      - openspace_net
+
+  # ─── API Gateway Service (:3005) ───────────────────────────────────────────
+  api-gateway:
+    <<: *default-logging
+    image: anuj304/openspace:api-gateway
+    container_name: openspace_api_gateway
+    restart: unless-stopped
+    ports:
+      - "3005:3005"
+    environment:
+      - NODE_ENV=production
+      - PORT=3005
+      # Local HTTP Service on this EC2 instance
+      - HTTP_SERVICE_URL=http://http-service:3001
+      # Remote Chat & WS Services on EC2 #2 (Realtime Instance)
+      - CHAT_SERVICE_URL=${REALTIME_SERVER_CHAT_URL}
+      - WS_SERVICE_URL=${REALTIME_SERVER_WS_URL}
+      - REDIS_URL=${REDIS_URL}
+      - JWT_SECRET=${JWT_SECRET}
+      - WEB_APP_URL=${WEB_APP_URL}
+      - GATEWAY_INTERNAL_SECRET=${GATEWAY_INTERNAL_SECRET}
+      - ACCESS_TOKEN_COOKIE_NAME=${ACCESS_TOKEN_COOKIE_NAME:-accessToken}
+      - COOKIE_DOMAIN=${COOKIE_DOMAIN:-}
+      - COOKIE_SAME_SITE=${COOKIE_SAME_SITE:-lax}
+      - PRAMAAN_CLIENT_ID=${PRAMAAN_CLIENT_ID}
+      - PRAMAAN_SERVER_URL=${PRAMAAN_SERVER_URL}
+    depends_on:
+      - http-service
+    networks:
+      - openspace_net
+
+  # ─── HTTP Service (:3001) ──────────────────────────────────────────────────
+  http-service:
+    <<: *default-logging
+    image: anuj304/openspace:http-service
+    container_name: openspace_http_service
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+      - JWT_SECRET=${JWT_SECRET}
+      - WEB_APP_URL=${WEB_APP_URL}
+      - GATEWAY_INTERNAL_SECRET=${GATEWAY_INTERNAL_SECRET}
+      - ACCESS_TOKEN_COOKIE_NAME=${ACCESS_TOKEN_COOKIE_NAME:-accessToken}
+      - COOKIE_DOMAIN=${COOKIE_DOMAIN:-}
+      - COOKIE_SAME_SITE=${COOKIE_SAME_SITE:-lax}
+      - PRAMAAN_CLIENT_ID=${PRAMAAN_CLIENT_ID}
+      - PRAMAAN_SECRET=${PRAMAAN_SECRET}
+      - CALLBACK_URL=${CALLBACK_URL}
+      - PRAMAAN_SERVER_URL=${PRAMAAN_SERVER_URL}
+    networks:
+      - openspace_net
+
+networks:
+  openspace_net:
+    driver: bridge
+
+volumes:
+  caddy_data:
+  caddy_config:

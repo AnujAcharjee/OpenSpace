@@ -116,7 +116,7 @@ jobs:
 #          host: ${{ secrets.EC2_HOST }}
 #          username: ${{ secrets.EC2_USER }}
 #          key: ${{ secrets.EC2_SSH_KEY }}
-#          source: "docker-compose.yml,Caddyfile"
+#          source: "docker-compose.full.yml,Caddyfile"
 #          target: "~/OpenSpace"
 #
 #      - name: Deploy Docker Compose Services
