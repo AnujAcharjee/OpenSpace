@@ -136,7 +136,7 @@ export default function HomePage() {
         <div className="relative mb-28 w-full max-w-4xl rounded-[var(--radius-sketch-lg)] border border-line bg-paper-subtle p-2 sm:p-2.5 shadow-xl">
           <div className="grid grid-cols-12 gap-2 sm:gap-2.5">
             {/* Left Panel: Sidebar (Channels) */}
-            <div className="col-span-12 sm:col-span-5 rounded-[var(--radius-sketch-md)] border border-line bg-paper shadow-2xs overflow-hidden flex flex-col text-left">
+            <div className="col-span-12 sm:col-span-5 rounded-[var(--radius-sketch-md)] border border-[#d4a03d]/40 dark:border-line bg-paper shadow-2xs overflow-hidden flex flex-col text-left">
               {/* Sidebar Header */}
               <div className="flex flex-col gap-2.5 border-b border-line px-3.5 py-3 bg-paper-subtle">
                 <div className="flex items-center justify-between">
@@ -233,7 +233,7 @@ export default function HomePage() {
             </div>
 
             {/* Right Panel: Chat Section (New Sign-In User Welcome State) */}
-            <div className="col-span-12 sm:col-span-7 rounded-[var(--radius-sketch-md)] border border-line bg-paper shadow-2xs overflow-hidden flex flex-col justify-center items-center text-center p-6 min-h-[320px]">
+            <div className="col-span-12 sm:col-span-7 rounded-[var(--radius-sketch-md)] border border-[#d4a03d]/40 dark:border-line bg-paper shadow-2xs overflow-hidden flex flex-col justify-center items-center text-center p-6 min-h-[320px]">
               <div className="flex flex-col items-center max-w-sm space-y-3.5">
                 <div className="relative flex items-center justify-center py-2">
                   <AppIcon size="lg" />
@@ -244,7 +244,7 @@ export default function HomePage() {
                     Welcome to OpenSpace, Alex!
                   </h2>
                   <p className="text-xs text-ink-muted leading-relaxed">
-                    Pick a channel from the sidebar or search for a topic you&apos;re interested in to start discussing.
+                    Pick a channel from the sidebar and join the conversation.
                   </p>
                 </div>
 

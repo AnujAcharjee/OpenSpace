@@ -341,7 +341,7 @@ export default function ChatSection({
 
     return (
       <div className="h-full w-full p-1 sm:p-1.5">
-        <Card className="flex h-full w-full flex-col items-center justify-center border border-line bg-paper rounded-[var(--radius-sketch-md)] shadow-sm p-6 text-center">
+        <Card className="flex h-full w-full flex-col items-center justify-center border border-[#d4a03d]/40 dark:border-line bg-paper rounded-[var(--radius-sketch-md)] shadow-sm p-6 text-center">
           <div className="flex flex-col items-center max-w-sm space-y-4">
             <div className="relative flex items-center justify-center py-2">
               <AppIcon size="lg" />
@@ -352,7 +352,7 @@ export default function ChatSection({
                 Welcome to OpenSpace{user?.name ? `, ${user.name}` : user?.username ? `, ${user.username}` : ""}!
               </h2>
               <p className="text-xs text-ink-muted leading-relaxed">
-                Select a channel from your desk pad, explore communities by topic, or start your own channel.
+                Pick a channel from the sidebar and join the conversation.
               </p>
             </div>
 
@@ -398,7 +398,7 @@ export default function ChatSection({
 
   return (
     <div className="h-full w-full p-1 sm:p-1.5">
-      <Card className="flex h-full w-full flex-col gap-0 border border-line bg-paper shadow-sm rounded-[var(--radius-sketch-md)] p-0 overflow-hidden">
+      <Card className="flex h-full w-full flex-col gap-0 border border-[#d4a03d]/40 dark:border-line bg-paper shadow-sm rounded-[var(--radius-sketch-md)] p-0 overflow-hidden">
         {/* Letterhead Header */}
         <CardHeader className="shrink-0 flex items-center gap-2 border-b border-line bg-paper-subtle/80 px-3 py-3 backdrop-blur-xs">
           <button

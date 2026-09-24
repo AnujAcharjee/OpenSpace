@@ -1,8 +1,9 @@
 "use client"
 
-import { useState, useEffect, useMemo, useCallback } from "react"
+import { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import {
   IconSearch,
+  IconFilter,
   IconHash,
   IconLock,
   IconLockOpen2,
@@ -25,18 +26,41 @@ import { wsClient } from "@/ws"
 import { useShallow } from "zustand/react/shallow"
 
 export const PREDEFINED_TOPICS = [
-  "General",
-  "Technology",
-  "Design",
-  "Gaming",
-  "Music",
-  "Crypto",
-  "Dev",
-  "Art",
-  "Science",
-  "News",
-  "Books",
-  "Lifestyle",
+  "technology",
+  "ai",
+  "programming",
+  "startups",
+  "gaming",
+  "football",
+  "cricket",
+  "basketball",
+  "f1",
+  "sports",
+  "music",
+  "movies",
+  "tv-shows",
+  "anime",
+  "memes",
+  "news",
+  "world-news",
+  "science",
+  "business",
+  "politics",
+  "finance",
+  "education",
+  "career",
+  "fitness",
+  "food",
+  "travel",
+  "fashion",
+  "books",
+  "photography",
+  "cars",
+  "general",
+  "random",
+  "debate",
+  "advice",
+  "off-topic",
 ] as const
 
 const FILTER_TOPICS = ["All", ...PREDEFINED_TOPICS] as const
@@ -52,32 +76,81 @@ function getTopicColor(topic: string): {
   border: string
 } {
   const lower = topic.toLowerCase()
-  if (lower.includes("tech") || lower.includes("dev")) {
+  if (
+    lower.includes("tech") ||
+    lower.includes("dev") ||
+    lower.includes("program") ||
+    lower.includes("ai") ||
+    lower.includes("car")
+  ) {
     return {
       bg: "bg-[var(--pencil-blue-soft)]",
       text: "text-[var(--pencil-blue)]",
       border: "border-[var(--pencil-blue)]/30",
     }
   }
-  if (lower.includes("design") || lower.includes("art")) {
+  if (
+    lower.includes("design") ||
+    lower.includes("art") ||
+    lower.includes("fashion") ||
+    lower.includes("photo") ||
+    lower.includes("book")
+  ) {
     return {
       bg: "bg-[var(--pencil-coral-soft)]",
       text: "text-[var(--pencil-coral)]",
       border: "border-[var(--pencil-coral)]/30",
     }
   }
-  if (lower.includes("gam") || lower.includes("music")) {
+  if (
+    lower.includes("gam") ||
+    lower.includes("music") ||
+    lower.includes("movie") ||
+    lower.includes("anime") ||
+    lower.includes("meme") ||
+    lower.includes("tv") ||
+    lower.includes("random") ||
+    lower.includes("off-topic")
+  ) {
     return {
       bg: "bg-[var(--pencil-yellow-soft)]",
       text: "text-[var(--pencil-yellow)]",
       border: "border-[var(--pencil-yellow)]/30",
     }
   }
-  if (lower.includes("science") || lower.includes("crypto")) {
+  if (
+    lower.includes("sport") ||
+    lower.includes("foot") ||
+    lower.includes("cricket") ||
+    lower.includes("basket") ||
+    lower.includes("f1") ||
+    lower.includes("fit") ||
+    lower.includes("food") ||
+    lower.includes("travel")
+  ) {
     return {
       bg: "bg-[var(--pencil-green-soft)]",
       text: "text-[var(--pencil-green)]",
       border: "border-[var(--pencil-green)]/30",
+    }
+  }
+  if (
+    lower.includes("science") ||
+    lower.includes("crypto") ||
+    lower.includes("biz") ||
+    lower.includes("business") ||
+    lower.includes("finance") ||
+    lower.includes("startup") ||
+    lower.includes("politic") ||
+    lower.includes("news") ||
+    lower.includes("world") ||
+    lower.includes("career") ||
+    lower.includes("debate")
+  ) {
+    return {
+      bg: "bg-[var(--pencil-orange-soft)]",
+      text: "text-[var(--pencil-orange)]",
+      border: "border-[var(--pencil-orange)]/30",
     }
   }
   return {
@@ -117,6 +190,30 @@ export function ExploreChannels({
   const [joiningRoomId, setJoiningRoomId] = useState<string | null>(null)
   const [pendingJoinRoomIds, setPendingJoinRoomIds] = useState<Record<string, boolean>>({})
   const [showMobileDetail, setShowMobileDetail] = useState(false)
+  const [isFilterOpen, setIsFilterOpen] = useState(false)
+  const [filterSearch, setFilterSearch] = useState("")
+  const filterRef = useRef<HTMLDivElement>(null)
+
+  // Close filter dropdown on click outside
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (filterRef.current && !filterRef.current.contains(e.target as Node)) {
+        setIsFilterOpen(false)
+      }
+    }
+    if (isFilterOpen) {
+      document.addEventListener("mousedown", handleClickOutside)
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside)
+    }
+  }, [isFilterOpen])
+
+  const filteredTopics = useMemo(() => {
+    if (!filterSearch.trim()) return FILTER_TOPICS
+    const q = filterSearch.trim().toLowerCase()
+    return FILTER_TOPICS.filter((t) => t.toLowerCase().includes(q))
+  }, [filterSearch])
 
   // Fetch channels in paginated chunks
   const fetchPage = useCallback(
@@ -249,7 +346,7 @@ export function ExploreChannels({
 
   return (
     <div className="flex h-full w-full flex-col overflow-hidden bg-paper text-ink p-1 sm:p-1.5">
-      <Card className="flex h-full w-full flex-col gap-0 border border-line bg-paper shadow-sm rounded-[var(--radius-sketch-md)] p-0 overflow-hidden">
+      <Card className="flex h-full w-full flex-col gap-0 border border-[#d4a03d]/40 dark:border-line bg-paper shadow-sm rounded-[var(--radius-sketch-md)] p-0 overflow-hidden">
         {/* Top Stationery Header (No channel count numbers) */}
         <div className="shrink-0 flex items-center justify-between border-b border-line bg-paper-subtle/80 px-3.5 py-2.5 backdrop-blur-xs">
           <div className="flex items-center gap-2">
@@ -290,9 +387,9 @@ export function ExploreChannels({
               showMobileDetail ? "hidden md:flex" : "flex"
             } w-full md:w-[320px] lg:w-[350px] shrink-0 flex-col border-r border-line bg-paper overflow-hidden`}
           >
-            {/* Search Box */}
-            <div className="p-2.5 border-b border-line bg-paper-subtle/50">
-              <div className="relative">
+            {/* Search Box with Topic Filter */}
+            <div className="p-2.5 border-b border-line bg-paper-subtle/50 relative">
+              <div className="relative flex items-center" ref={filterRef}>
                 <IconSearch
                   size={13}
                   className="absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-muted pointer-events-none"
@@ -300,46 +397,118 @@ export function ExploreChannels({
                 <input
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search channels & topics..."
-                  className="h-7.5 w-full rounded-[var(--radius-sketch-sm)] border border-line bg-paper pl-7 pr-7 text-xs text-ink placeholder:text-ink-subtle outline-none focus:border-[var(--pencil-green)] focus:ring-1 focus:ring-[var(--pencil-green-soft)] transition-all"
+                  placeholder="Search channels..."
+                  className={`h-7.5 w-full rounded-[var(--radius-sketch-sm)] border border-line bg-paper pl-7 ${
+                    selectedTopic !== "All"
+                      ? searchQuery
+                        ? "pr-28"
+                        : "pr-24"
+                      : searchQuery
+                        ? "pr-14"
+                        : "pr-8"
+                  } text-xs text-ink placeholder:text-ink-subtle outline-none focus:border-[var(--pencil-green)] focus:ring-1 focus:ring-[var(--pencil-green-soft)] transition-all`}
                 />
-                {searchQuery && (
+
+                <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery("")}
+                      className="text-ink-muted hover:text-ink rounded p-0.5"
+                      title="Clear search"
+                    >
+                      <IconX size={12} />
+                    </button>
+                  )}
                   <button
                     type="button"
-                    onClick={() => setSearchQuery("")}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-ink-muted hover:text-ink rounded p-0.5"
+                    onClick={() => {
+                      setIsFilterOpen((prev) => !prev)
+                      setFilterSearch("")
+                    }}
+                    className={`flex items-center gap-1 h-5.5 px-1.5 rounded-[var(--radius-sketch-sm)] border transition-all cursor-pointer ${
+                      selectedTopic !== "All"
+                        ? "bg-[var(--pencil-green)] text-white border-[var(--pencil-green)] shadow-2xs font-semibold"
+                        : isFilterOpen
+                        ? "bg-paper-dark border-line-strong text-ink"
+                        : "bg-paper text-ink-muted border-line hover:border-line-strong hover:text-ink"
+                    }`}
+                    title={selectedTopic !== "All" ? `Filtered by #${selectedTopic} (click to change)` : "Filter by topic"}
                   >
-                    <IconX size={12} />
+                    <IconFilter size={11} />
+                    {selectedTopic !== "All" && (
+                      <span className="text-[10px] max-w-[65px] truncate leading-none">
+                        {selectedTopic}
+                      </span>
+                    )}
                   </button>
-                )}
-              </div>
+                </div>
 
-              {/* Topic Filter Chips Scrollbar */}
-              <div
-                onWheel={(e) => {
-                  if (e.deltaY !== 0) {
-                    e.currentTarget.scrollLeft += e.deltaY
-                  }
-                }}
-                className="flex items-center gap-1 overflow-x-auto overflow-y-hidden pt-2 pb-0.5 scrollbar-thin select-none"
-              >
-                {FILTER_TOPICS.map((topic) => {
-                  const isSelected = selectedTopic === topic
-                  return (
-                    <button
-                      key={topic}
-                      type="button"
-                      onClick={() => setSelectedTopic(topic)}
-                      className={`shrink-0 rounded-[var(--radius-sketch-sm)] px-2 py-0.5 text-[10px] font-medium transition-all duration-150 cursor-pointer ${
-                        isSelected
-                          ? "bg-[var(--pencil-green)] text-white shadow-2xs font-semibold"
-                          : "border border-line bg-paper text-ink-muted hover:border-[var(--pencil-green)]/40 hover:text-ink"
-                      }`}
-                    >
-                      {topic === "All" ? "All" : topic}
-                    </button>
-                  )
-                })}
+                {/* Topics Dropdown */}
+                {isFilterOpen && (
+                  <div className="absolute left-0 right-0 top-full mt-1.5 rounded-[var(--radius-sketch-md)] border border-line bg-paper shadow-lg z-50 overflow-hidden flex flex-col">
+                    {/* Filter header with search & reset */}
+                    <div className="p-2 border-b border-line bg-paper-subtle space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-semibold text-ink font-display">
+                          Filter by Topic
+                        </span>
+                        {selectedTopic !== "All" && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedTopic("All")
+                              setIsFilterOpen(false)
+                            }}
+                            className="text-[10px] text-[var(--pencil-coral)] hover:underline font-medium cursor-pointer"
+                          >
+                            Reset filter
+                          </button>
+                        )}
+                      </div>
+                      <input
+                        type="text"
+                        value={filterSearch}
+                        onChange={(e) => setFilterSearch(e.target.value)}
+                        placeholder="Search topics..."
+                        className="h-6.5 w-full rounded-[var(--radius-sketch-sm)] border border-line bg-paper px-2 text-[11px] text-ink placeholder:text-ink-subtle outline-none focus:border-[var(--pencil-green)] transition-all"
+                        autoFocus
+                      />
+                    </div>
+
+                    {/* Topics List */}
+                    <div className="max-h-56 overflow-y-auto p-1 scrollbar-ultra-thin space-y-0.5">
+                      {filteredTopics.map((topic) => {
+                        const isSelected = selectedTopic === topic
+                        return (
+                          <button
+                            key={topic}
+                            type="button"
+                            onClick={() => {
+                              setSelectedTopic(topic)
+                              setIsFilterOpen(false)
+                            }}
+                            className={`w-full flex items-center justify-between px-2.5 py-1 rounded-[var(--radius-sketch-sm)] text-xs text-left transition-colors cursor-pointer ${
+                              isSelected
+                                ? "bg-[var(--pencil-green-soft)] text-[var(--pencil-green)] font-semibold"
+                                : "text-ink hover:bg-paper-subtle"
+                            }`}
+                          >
+                            <span className="truncate">
+                              {topic === "All" ? "All Channels" : `#${topic}`}
+                            </span>
+                            {isSelected && <IconCheck size={12} className="shrink-0 ml-1.5" />}
+                          </button>
+                        )
+                      })}
+                      {filteredTopics.length === 0 && (
+                        <div className="py-3 text-center text-[11px] text-ink-subtle">
+                          No matching topics
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -364,7 +533,7 @@ export function ExploreChannels({
                   {channels.map((channel) => {
                     const isSelected = activeChannel?.id === channel.id
                     const channelTopics =
-                      channel.topics && channel.topics.length > 0 ? channel.topics : ["General"]
+                      channel.topics && channel.topics.length > 0 ? channel.topics : ["general"]
                     const isMember = user ? channel.members.some((m) => m.userId === user.id) : false
 
                     return (
@@ -521,7 +690,7 @@ export function ExploreChannels({
                       <div className="flex flex-wrap items-center gap-1.5 pt-2">
                         {(activeChannel.topics && activeChannel.topics.length > 0
                           ? activeChannel.topics
-                          : ["General"]
+                          : ["general"]
                         ).map((topic) => {
                           const style = getTopicColor(topic)
                           return (

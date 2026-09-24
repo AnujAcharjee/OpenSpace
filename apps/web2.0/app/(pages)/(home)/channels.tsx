@@ -293,7 +293,7 @@ export default function ChannelsSection() {
 
   return (
     <div className="h-full w-full p-1 sm:p-1.5">
-      <Card className="relative flex h-full w-full flex-col border border-line bg-paper shadow-sm rounded-[var(--radius-sketch-md)] p-0 overflow-hidden">
+      <Card className="relative flex h-full w-full flex-col border border-[#d4a03d]/40 dark:border-line bg-paper shadow-sm rounded-[var(--radius-sketch-md)] p-0 overflow-hidden">
         {/* Letterhead Header */}
         <CardHeader className="shrink-0 relative z-30 flex flex-col gap-3 border-b border-line px-4 py-3 bg-paper-subtle/80 backdrop-blur-xs w-full">
           <CardTitle className="flex w-full items-center justify-between gap-2">
@@ -895,11 +895,18 @@ export function DialogCreateRoom({
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
   const [isPrivate, setIsPrivate] = useState(false)
-  const [selectedTopics, setSelectedTopics] = useState<string[]>([defaultTopic ?? "General"])
+  const [selectedTopics, setSelectedTopics] = useState<string[]>([defaultTopic ?? "general"])
+  const [topicSearch, setTopicSearch] = useState("")
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const visibleTopics = useMemo(() => {
+    if (!topicSearch.trim()) return PREDEFINED_TOPICS
+    const q = topicSearch.trim().toLowerCase()
+    return PREDEFINED_TOPICS.filter((t) => t.toLowerCase().includes(q))
+  }, [topicSearch])
 
   useEffect(() => {
     if (defaultTopic && !selectedTopics.includes(defaultTopic)) {
@@ -911,7 +918,8 @@ export function DialogCreateRoom({
     setName("")
     setDescription("")
     setIsPrivate(false)
-    setSelectedTopics([defaultTopic ?? "General"])
+    setSelectedTopics([defaultTopic ?? "general"])
+    setTopicSearch("")
     setAvatarUrl(null)
     setError(null)
   }
@@ -957,7 +965,7 @@ export function DialogCreateRoom({
         name: name.trim(),
         description: description.trim() || undefined,
         isPrivate,
-        topics: selectedTopics.length > 0 ? selectedTopics : ["General"],
+        topics: selectedTopics.length > 0 ? selectedTopics : ["general"],
         avatarUrl,
         creatorId,
       }
@@ -1112,8 +1120,16 @@ export function DialogCreateRoom({
                 {selectedTopics.length} selected
               </span>
             </div>
-            <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto p-1.5 rounded-[var(--radius-sketch-sm)] border border-line bg-paper-subtle scrollbar-thin">
-              {PREDEFINED_TOPICS.map((topic) => {
+            {/* Quick search/filter input for topics */}
+            <input
+              type="text"
+              value={topicSearch}
+              onChange={(e) => setTopicSearch(e.target.value)}
+              placeholder="Search topics (e.g. ai, gaming, sports)..."
+              className="h-7 w-full rounded-[var(--radius-sketch-sm)] border border-line bg-paper px-2.5 text-[11px] text-ink placeholder:text-ink-subtle outline-none focus:border-[var(--pencil-blue)] focus:ring-1 focus:ring-[var(--pencil-blue-soft)] transition-all"
+            />
+            <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto p-1.5 rounded-[var(--radius-sketch-sm)] border border-line bg-paper-subtle scrollbar-ultra-thin">
+              {visibleTopics.map((topic) => {
                 const isSelected = selectedTopics.includes(topic)
                 return (
                   <button
@@ -1130,6 +1146,11 @@ export function DialogCreateRoom({
                   </button>
                 )
               })}
+              {visibleTopics.length === 0 && (
+                <div className="w-full py-2 text-center text-[11px] text-ink-subtle">
+                  No matching topics found
+                </div>
+              )}
             </div>
           </div>
 
