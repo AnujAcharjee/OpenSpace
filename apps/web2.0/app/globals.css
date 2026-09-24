@@ -1,0 +1,374 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-paper-subtle: var(--paper-subtle);
+  --color-paper-dark: var(--paper-dark);
+  --color-surface: var(--surface);
+  --color-surface-hover: var(--surface-hover);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-subtle: var(--ink-subtle);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-line-sketch: var(--line-sketch);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+}
+
+@layer base {
+  :root {
+    /* ─── Light Mode Palette (Hierarchy: #F5EFE6 > #E8DFCA > #6D94C5 > #CBDCEB) ─── */
+    /* 1. #F5EFE6 (~60% Canvas / Primary Paper Base) */
+    --paper: #F5EFE6;
+    --paper-dark: #E2D7C1;
+    --surface: #FCFAF6;
+    
+    /* 2. #E8DFCA (~30% Secondary Surfaces, Sidebars, Cards, Panels, Dividers) */
+    --paper-subtle: #E8DFCA;
+    --surface-hover: #E8DFCA;
+    --line: #E8DFCA;
+    --line-strong: #D5C9B1;
+    --line-sketch: #213753;
+
+    /* Text & Ink */
+    --ink: #1C242C;
+    --ink-muted: #4F5A66;
+    --ink-subtle: #7D8896;
+
+    /* 3. #6D94C5 (~7-8% Primary Interactive Accent, Actions, Active Marks) */
+    --pencil-teal: #6D94C5;
+    --pencil-blue: #6D94C5;
+    --primary: #6D94C5;
+    --primary-foreground: #FFFFFF;
+    --ring: #6D94C5;
+
+    /* 4. #CBDCEB (~2-3% Soft Accents, Selected Pill Fills, Badge Highlights) */
+    --pencil-teal-soft: #CBDCEB;
+    --pencil-blue-soft: #CBDCEB;
+    --accent: #CBDCEB;
+    --accent-foreground: #213753;
+
+    /* Supporting colored pencil tones */
+    --pencil-coral: #C85C50;
+    --pencil-coral-soft: #F7DDD9;
+    --pencil-yellow: #D4A03D;
+    --pencil-yellow-soft: #E8DFCA;
+    --pencil-orange: #C96E42;
+    --pencil-orange-soft: #F8E3D7;
+    --pencil-green: #527A56;
+    --pencil-green-soft: #DEEBDD;
+
+    /* Semantic Tokens */
+    --background: var(--paper);
+    --foreground: var(--ink);
+    --card: var(--surface);
+    --card-foreground: var(--ink);
+    --popover: var(--surface);
+    --popover-foreground: var(--ink);
+    --secondary: var(--paper-subtle);
+    --secondary-foreground: var(--ink);
+    --muted: var(--paper-subtle);
+    --muted-foreground: var(--ink-muted);
+    --destructive: var(--pencil-coral);
+    --destructive-foreground: #FFFFFF;
+    --border: var(--line);
+    --input: var(--line);
+
+    /* Organic Hand-Drawn Sketch Curvature */
+    --radius: 12px;
+    --radius-sketch-sm: 8px 6px 9px 7px;
+    --radius-sketch-md: 14px 11px 15px 12px;
+    --radius-sketch-lg: 20px 18px 22px 17px;
+  }
+
+  .dark {
+    /* ─── Dark Mode Palette: #152636 (bg) | #4580b4 | #F5EFE6 | #E8DFCA ─── */
+    /* 1. #152636 (~60% Canvas / Midnight Slate Paper Base) */
+    --paper: #152636;
+    --paper-subtle: #1C3044;
+    --paper-dark: #0F1C28;
+    --surface: #1E344A;
+    --surface-hover: #26425E;
+
+    /* 2. #4580b4 (~30% Secondary Surfaces, Cards, Outlines, Controls & Primary Actions) */
+    --primary: #4580b4;
+    --primary-foreground: #F5EFE6;
+    --line: #26425E;
+    --line-strong: #4580b4;
+    --ring: #4580b4;
+    --pencil-teal: #4580b4;
+    --pencil-teal-soft: rgba(69, 128, 180, 0.25);
+    --pencil-blue: #6D94C5;
+    --pencil-blue-soft: rgba(109, 148, 197, 0.25);
+
+    /* 3. #F5EFE6 (~7-8% High-Contrast Text / Primary Ink & Headlines) */
+    --ink: #F5EFE6;
+    --foreground: var(--ink);
+    --card-foreground: var(--ink);
+    --popover-foreground: var(--ink);
+
+    /* 4. #E8DFCA (~2-3% Secondary Text, Subtle Labels, Warm Badges) */
+    --ink-muted: #E8DFCA;
+    --ink-subtle: #B0C2D5;
+    --line-sketch: #E8DFCA;
+    --secondary-foreground: #E8DFCA;
+    --muted-foreground: #E8DFCA;
+
+    /* Supporting colored pencil tones for dark mode */
+    --pencil-coral: #DE796E;
+    --pencil-coral-soft: rgba(222, 121, 110, 0.2);
+    --pencil-yellow: #E6B559;
+    --pencil-yellow-soft: rgba(230, 181, 89, 0.2);
+    --pencil-orange: #DE875D;
+    --pencil-orange-soft: rgba(222, 135, 93, 0.2);
+    --pencil-green: #709E75;
+    --pencil-green-soft: rgba(112, 158, 117, 0.2);
+
+    /* Semantic Tokens */
+    --background: var(--paper);
+    --card: var(--surface);
+    --popover: var(--surface);
+    --secondary: var(--paper-subtle);
+    --muted: var(--paper-subtle);
+    --accent: rgba(69, 128, 180, 0.25);
+    --accent-foreground: #F5EFE6;
+    --destructive: var(--pencil-coral);
+    --destructive-foreground: #FFFFFF;
+    --border: var(--line);
+    --input: var(--line);
+  }
+}
+
+/* ─── Artisanal Handmade Paper Texture & Watercolor Dynamics ──────────────── */
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-feature-settings: "rlig" 1, "calt" 1;
+  background-image:
+    /* Layer 1: Authentic cold-press handmade paper pulp grain */
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 300 300' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='paperGrain'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.68' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 0.05 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23paperGrain)'/%3E%3C/svg%3E"),
+    /* Layer 2: Soft watercolor washes bleeding into the paper */
+    radial-gradient(ellipse at 12% 16%, rgba(232, 223, 202, 0.5) 0%, transparent 60%),
+    radial-gradient(ellipse at 88% 84%, rgba(203, 220, 235, 0.35) 0%, transparent 55%);
+  background-attachment: fixed;
+}
+
+.dark body,
+html.dark body {
+  background-color: var(--background);
+  background-image:
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 300 300' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='paperGrainDark'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.68' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 0.035 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23paperGrainDark)'/%3E%3C/svg%3E"),
+    radial-gradient(ellipse at 12% 16%, rgba(28, 48, 68, 0.45) 0%, transparent 60%),
+    radial-gradient(ellipse at 88% 84%, rgba(69, 128, 180, 0.18) 0%, transparent 55%);
+  background-attachment: fixed;
+}
+
+/* Handmade Paper Shading for Nested Cards & Viewports */
+.paper-texture {
+  background-color: var(--paper);
+  background-image:
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 300 300' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='subtleGrain'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 0.035 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23subtleGrain)'/%3E%3C/svg%3E");
+}
+
+.dark .paper-texture {
+  background-image:
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 300 300' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='subtleGrainDark'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 0.025 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23subtleGrainDark)'/%3E%3C/svg%3E");
+}
+
+.paper-sheet {
+  background-color: var(--surface);
+  border: 1.5px solid var(--line-strong);
+  border-radius: var(--radius-sketch-md);
+  box-shadow:
+    0 2px 12px -3px rgba(33, 55, 83, 0.08),
+    0 1px 3px rgba(33, 55, 83, 0.04);
+}
+
+.dark .paper-sheet {
+  box-shadow:
+    0 3px 16px -4px rgba(0, 0, 0, 0.45),
+    0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+/* Organic Sketch Border Radii */
+.sketch-sm {
+  border-radius: var(--radius-sketch-sm);
+}
+
+.sketch-md {
+  border-radius: var(--radius-sketch-md);
+}
+
+.sketch-lg {
+  border-radius: var(--radius-sketch-lg);
+}
+
+/* ─── Watercolor Washes & Pigment Highlights ────────────────────────── */
+.watercolor-wash-teal,
+.pencil-highlight-teal {
+  background: linear-gradient(135deg, var(--pencil-teal-soft) 0%, color-mix(in srgb, var(--pencil-teal-soft) 65%, transparent) 100%);
+  color: var(--ink);
+  border: 1px solid color-mix(in srgb, var(--pencil-teal) 45%, transparent);
+  box-shadow: 0 1px 6px -1px color-mix(in srgb, var(--pencil-teal) 20%, transparent);
+}
+
+.watercolor-wash-yellow,
+.pencil-highlight-yellow {
+  background: linear-gradient(135deg, var(--pencil-yellow-soft) 0%, color-mix(in srgb, var(--pencil-yellow-soft) 60%, transparent) 100%);
+  color: var(--ink);
+  border: 1px solid color-mix(in srgb, var(--pencil-yellow) 40%, transparent);
+}
+
+.watercolor-wash-coral,
+.pencil-highlight-coral {
+  background: linear-gradient(135deg, var(--pencil-coral-soft) 0%, color-mix(in srgb, var(--pencil-coral-soft) 60%, transparent) 100%);
+  color: var(--ink);
+  border: 1px solid color-mix(in srgb, var(--pencil-coral) 40%, transparent);
+}
+
+/* Tactile Stationery Lift & Press */
+.stationery-tap {
+  transition: transform 120ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 120ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.stationery-tap:hover {
+  transform: translateY(-1px);
+}
+
+.stationery-tap:active {
+  transform: translateY(1px);
+}
+
+/* Scrollbar Styled as Drafting Ruler */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--ink-subtle);
+}
+
+/* Ultra-Thin Scrollbar for Pickers & Small Panels */
+.scrollbar-ultra-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+.scrollbar-ultra-thin::-webkit-scrollbar {
+  width: 3px;
+  height: 3px;
+}
+.scrollbar-ultra-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-ultra-thin::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border-radius: 9999px;
+}
+.scrollbar-ultra-thin::-webkit-scrollbar-thumb:hover {
+  background: var(--ink-subtle);
+}
+
+/* Hide scrollbars cleanly */
+.no-scrollbar,
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar,
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+/* ─── Hero Headline Pop-Out & Stationery Pencil Underline ──────────── */
+@keyframes hero-pop-out {
+  0% {
+    opacity: 0;
+    transform: translateY(16px) scale(0.9);
+    filter: blur(2px);
+  }
+  65% {
+    opacity: 1;
+    transform: translateY(-3px) scale(1.04);
+    filter: blur(0px);
+  }
+  85% {
+    transform: translateY(1px) scale(0.995);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0px);
+  }
+}
+
+@keyframes pencil-line-draw {
+  0% {
+    stroke-dashoffset: 100;
+    opacity: 0;
+  }
+  30% {
+    opacity: 0.85;
+  }
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+}
+
+.hero-pop-text {
+  display: inline-block;
+  animation: hero-pop-out 0.85s cubic-bezier(0.16, 1, 0.3, 1) 0.18s both;
+  will-change: transform, opacity;
+  transform-origin: center bottom;
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.hero-pop-text:hover {
+  transform: translateY(-2px) scale(1.025);
+}
+
+.hero-pop-underline {
+  stroke-dasharray: 100;
+  animation: pencil-line-draw 0.85s cubic-bezier(0.16, 1, 0.3, 1) 0.45s both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-pop-text,
+  .hero-pop-underline {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+    filter: none !important;
+    stroke-dashoffset: 0 !important;
+  }
+}
