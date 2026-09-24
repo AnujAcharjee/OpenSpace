@@ -87,10 +87,7 @@ export function DialogSettings() {
       if (removePhoto) {
         finalAvatarUrl = null
       } else if (selectedFile) {
-        toast.info("Optimizing profile photo...", toastOptions)
         const optimizedBlob = await optimizeImage(selectedFile)
-
-        toast.info("Uploading photo to Cloudinary...", toastOptions)
         finalAvatarUrl = await uploadToCloudinary(optimizedBlob)
       }
 

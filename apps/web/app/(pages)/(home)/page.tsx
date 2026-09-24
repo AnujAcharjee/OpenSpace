@@ -100,7 +100,7 @@ export default function HomePage() {
             href="https://github.com/AnujAcharjee/collab"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 rounded-full border border-border/60 bg-white/80 dark:bg-card/40 px-3.5 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground shadow-2xs"
+            className="hidden sm:flex items-center gap-1.5 rounded-full border border-border/60 bg-white/80 dark:bg-card/40 px-3.5 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground shadow-2xs"
           >
             <IconBrandGithub size={15} />
             <span className="hidden sm:inline">GitHub</span>
@@ -110,7 +110,7 @@ export default function HomePage() {
 
           <Link
             href={appUrl}
-            className="inline-flex h-8 items-center justify-center rounded-full bg-primary px-4 text-xs font-semibold text-primary-foreground shadow-[0_0_12px_rgba(212,175,55,0.35)] transition-all duration-200 hover:shadow-[0_0_16px_rgba(212,175,55,0.55)] hover:brightness-105 active:scale-95 cursor-pointer"
+            className="hidden sm:inline-flex h-8 items-center justify-center rounded-full bg-primary px-4 text-xs font-semibold text-primary-foreground shadow-[0_0_12px_rgba(212,175,55,0.35)] transition-all duration-200 hover:shadow-[0_0_16px_rgba(212,175,55,0.55)] hover:brightness-105 active:scale-95 cursor-pointer"
           >
             {user ? "Open App" : "Sign In"}
           </Link>

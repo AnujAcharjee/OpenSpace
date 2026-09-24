@@ -78,11 +78,12 @@ const toastOptions = {
 
 export default function RoomsSection() {
   const router = useRouter()
-  const { activeRoom, rooms, user, setActiveRoom, upsertRoom } = useAppStore(
+  const { activeRoom, rooms, user, roomUiOptions, setActiveRoom, upsertRoom } = useAppStore(
     useShallow((state) => ({
       activeRoom: state.activeRoom,
       rooms: state.rooms,
       user: state.user,
+      roomUiOptions: state.roomUiOptions,
       setActiveRoom: state.setActiveRoom,
       upsertRoom: state.upsertRoom,
     }))
@@ -102,11 +103,44 @@ export default function RoomsSection() {
   const searchContainerRef = useRef<HTMLDivElement>(null)
 
   const myRooms = useMemo(() => {
-    if (!user) return rooms
-    return rooms.filter((room) =>
-      room.members.some((member) => member.userId === user.id)
-    )
-  }, [rooms, user])
+    const list = !user
+      ? rooms
+      : rooms.filter((room) =>
+          room.members.some((member) => member.userId === user.id)
+        )
+
+    return [...list].sort((a, b) => {
+      const aOptions = roomUiOptions[a.id]
+      const bOptions = roomUiOptions[b.id]
+      const aPinned = Boolean(aOptions?.pinned)
+      const bPinned = Boolean(bOptions?.pinned)
+
+      // Pinned channels on top
+      if (aPinned !== bPinned) {
+        return aPinned ? -1 : 1
+      }
+
+      // If both are pinned, newest pinned at top
+      if (aPinned && bPinned) {
+        const aPinnedAt = aOptions?.pinnedAt ?? 0
+        const bPinnedAt = bOptions?.pinnedAt ?? 0
+        if (aPinnedAt !== bPinnedAt) {
+          return bPinnedAt - aPinnedAt
+        }
+      }
+
+      // Newest channel/activity at top
+      const aTime = Math.max(
+        a.lastMessage?.createdAt ? new Date(a.lastMessage.createdAt).getTime() : 0,
+        a.createdAt ? new Date(a.createdAt).getTime() : 0
+      )
+      const bTime = Math.max(
+        b.lastMessage?.createdAt ? new Date(b.lastMessage.createdAt).getTime() : 0,
+        b.createdAt ? new Date(b.createdAt).getTime() : 0
+      )
+      return bTime - aTime
+    })
+  }, [rooms, user, roomUiOptions])
 
   // Debounced auto-search as user types
   useEffect(() => {
@@ -527,7 +561,7 @@ function ListItems({
 
   const lastMessageText = room.lastMessage
     ? room.lastMessage.text?.trim() || "Attachment"
-    : room.description
+    : ""
   const lastMessageTime = room.lastMessage?.createdAt
     ? formatRoomTime(room.lastMessage.createdAt)
     : ""

@@ -17,6 +17,7 @@ export type RoomMessage = ChatMessagePayload & {
 
 export type RoomUiOptions = {
   pinned: boolean
+  pinnedAt?: number
   muted: boolean
   unread: boolean
   unreadCount?: number
@@ -181,16 +182,21 @@ const createRoomsSlice: StateCreator<AppState, [], [], RoomsState> = (set) => ({
       }
     }),
   toggleRoomPinned: (roomId) =>
-    set((state) => ({
-      roomUiOptions: {
-        ...state.roomUiOptions,
-        [roomId]: {
-          pinned: !(state.roomUiOptions[roomId]?.pinned ?? false),
-          muted: state.roomUiOptions[roomId]?.muted ?? false,
-          unread: state.roomUiOptions[roomId]?.unread ?? false,
+    set((state) => {
+      const isCurrentlyPinned = state.roomUiOptions[roomId]?.pinned ?? false
+      const nextPinned = !isCurrentlyPinned
+      return {
+        roomUiOptions: {
+          ...state.roomUiOptions,
+          [roomId]: {
+            pinned: nextPinned,
+            pinnedAt: nextPinned ? Date.now() : undefined,
+            muted: state.roomUiOptions[roomId]?.muted ?? false,
+            unread: state.roomUiOptions[roomId]?.unread ?? false,
+          },
         },
-      },
-    })),
+      }
+    }),
   toggleRoomMuted: (roomId) =>
     set((state) => ({
       roomUiOptions: {
