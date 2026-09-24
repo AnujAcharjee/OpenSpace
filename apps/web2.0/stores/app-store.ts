@@ -13,6 +13,7 @@ export type RoomMessage = ChatMessagePayload & {
   senderUsername?: string
   senderAvatarUrl?: string | null
   isDeleted?: boolean
+  status?: "sending" | "sent" | "failed"
 }
 
 export type RoomUiOptions = {
@@ -54,6 +55,8 @@ interface MessagesState {
   addMessage: (roomId: string, msg: RoomMessage) => void
   setMessages: (roomId: string, msgs: RoomMessage[]) => void
   removeMessage: (roomId: string, messageId: string) => void
+  replaceMessage: (roomId: string, oldMessageId: string, newMessage: RoomMessage) => void
+  updateMessageStatus: (roomId: string, messageId: string, status: "sending" | "sent" | "failed") => void
   clearMessages: (roomId: string) => void
 }
 
@@ -368,6 +371,42 @@ const createMessagesSlice: StateCreator<AppState, [], [], MessagesState> = (set)
           [roomId]: roomMsgs.map((m) =>
             m.id === messageId ? { ...m, isDeleted: true } : m
           ),
+        },
+      }
+    }),
+  replaceMessage: (roomId, oldMessageId, newMessage) =>
+    set((state) => {
+      const roomMsgs = state.messages[roomId] ?? []
+      const alreadyHasNew = roomMsgs.some(
+        (m) => m.id === newMessage.id && m.id !== oldMessageId
+      )
+
+      if (alreadyHasNew) {
+        // Message already arrived via WebSocket broadcast; drop the temporary optimistic message
+        return {
+          messages: {
+            ...state.messages,
+            [roomId]: roomMsgs
+              .filter((m) => m.id !== oldMessageId)
+              .map((m) => (m.id === newMessage.id ? { ...m, ...newMessage } : m)),
+          },
+        }
+      }
+
+      return {
+        messages: {
+          ...state.messages,
+          [roomId]: roomMsgs.map((m) => (m.id === oldMessageId ? newMessage : m)),
+        },
+      }
+    }),
+  updateMessageStatus: (roomId, messageId, status) =>
+    set((state) => {
+      const roomMsgs = state.messages[roomId] ?? []
+      return {
+        messages: {
+          ...state.messages,
+          [roomId]: roomMsgs.map((m) => (m.id === messageId ? { ...m, status } : m)),
         },
       }
     }),

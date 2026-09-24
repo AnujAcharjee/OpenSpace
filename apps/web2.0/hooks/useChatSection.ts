@@ -47,17 +47,20 @@ export function toRoomMessage(message: ChatHistoryMessage): RoomMessage {
   }
 }
 
-export function toRoomPreviewMessage(message: ChatHistoryMessage): RoomMessage {
+export function toRoomPreviewMessage(message: ChatHistoryMessage | RoomMessage): RoomMessage {
   return {
     id: message.id,
     type: (message.type as RoomMessage["type"]) ?? "TEXT",
-    sender: message.userId,
+    sender: "userId" in message ? (message as ChatHistoryMessage).userId : (message as RoomMessage).sender,
     roomId: message.roomId,
     text: message.text,
     attachments: message.attachments,
     parentId: message.parentId,
     parent: message.parent,
     createdAt: message.createdAt,
+    senderUsername: message.senderUsername,
+    senderAvatarUrl: message.senderAvatarUrl,
+    status: "status" in message ? message.status : undefined,
   }
 }
 
@@ -174,9 +177,12 @@ function useSendMessage(
   room: RoomRecord | null,
   userId: string,
   replyingTo: RoomMessage | null,
-  onSent: () => void
+  onSent: () => void,
+  currentUser?: { username?: string; avatarUrl?: string | null } | null
 ) {
   const addMessage = useAppStore((s) => s.addMessage)
+  const replaceMessage = useAppStore((s) => s.replaceMessage)
+  const updateMessageStatus = useAppStore((s) => s.updateMessageStatus)
   const updateRoomLastMessage = useAppStore((s) => s.updateRoomLastMessage)
   const storeDraft = useAppStore((s) => (room ? s.drafts[room.id] ?? "" : ""))
   const setRoomDraft = useAppStore((s) => s.setRoomDraft)
@@ -244,16 +250,60 @@ function useSendMessage(
   async function sendMessage(textOverride?: string) {
     if (!room) return
     const text = (textOverride !== undefined ? textOverride : draft).trim()
-    if ((!text && !stagedAttachment) || isSending || !userId) return
+    if ((!text && !stagedAttachment) || !userId) return
 
     const pendingAttachment = stagedAttachment
-    const originalDraft = draft
+    const replyTarget = replyingTo
+    const optimisticId = `temp-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
 
-    // Clear draft and state optimistically
+    // Create optimistic message to display immediately in the UI (0ms instant feel)
+    const optimisticMessage: RoomMessage = {
+      id: optimisticId,
+      sender: userId,
+      roomId: room.id,
+      text: text.length > 0 ? text : undefined,
+      attachments: pendingAttachment
+        ? JSON.stringify([
+            {
+              id: `temp-att-${Date.now()}`,
+              url: pendingAttachment.previewUrl || "",
+              name: pendingAttachment.name,
+              size: pendingAttachment.size,
+              mimeType: pendingAttachment.file.type,
+              type: pendingAttachment.type,
+            },
+          ])
+        : undefined,
+      type: pendingAttachment
+        ? pendingAttachment.type === "IMAGE"
+          ? "IMAGE"
+          : "FILE"
+        : "TEXT",
+      parentId: replyTarget?.id,
+      parent: replyTarget
+        ? {
+            id: replyTarget.id,
+            text: replyTarget.text,
+            senderUsername: replyTarget.senderUsername,
+            isDeleted: replyTarget.isDeleted,
+          }
+        : undefined,
+      senderUsername: currentUser?.username || "You",
+      senderAvatarUrl: currentUser?.avatarUrl,
+      createdAt: new Date().toISOString(),
+      isDeleted: false,
+      status: "sending",
+    }
+
+    // Instantly add message to UI & clear inputs
+    addMessage(room.id, optimisticMessage)
+    updateRoomLastMessage(room.id, toRoomPreviewMessage(optimisticMessage))
     setDraft("")
     setStagedAttachment(null)
     onSent()
-    setIsSending(true)
+    if (pendingAttachment) {
+      setIsSending(true)
+    }
 
     try {
       let uploadedAttachment: ChatAttachment | null = null
@@ -275,26 +325,29 @@ function useSendMessage(
             ? "IMAGE"
             : "FILE"
           : "TEXT",
-        parentId: replyingTo?.id,
+        parentId: replyTarget?.id,
       }
 
       const message = await createMessage(payload)
       if (pendingAttachment?.previewUrl) {
         URL.revokeObjectURL(pendingAttachment.previewUrl)
       }
-      addMessage(room.id, toRoomMessage(message))
+
+      // Replace optimistic message with confirmed server message
+      replaceMessage(room.id, optimisticId, {
+        ...toRoomMessage(message),
+        status: "sent",
+      })
       updateRoomLastMessage(room.id, toRoomPreviewMessage(message))
     } catch (error) {
-      console.warn("Send message failed, restoring draft:", error)
-      // Restore draft so user's typed thoughts are never lost
-      setDraft(originalDraft)
-      if (pendingAttachment) {
-        setStagedAttachment(pendingAttachment)
-      }
-      toast.error("Failed to send message. Your draft has been restored.", toastOptions)
+      console.warn("Send message failed:", error)
+      // Mark as failed in UI so "Not sent" in red is shown under message
+      updateMessageStatus(room.id, optimisticId, "failed")
     } finally {
-      setIsSending(false)
-      setUploadProgress(0)
+      if (pendingAttachment) {
+        setIsSending(false)
+        setUploadProgress(0)
+      }
     }
   }
 
@@ -695,7 +748,8 @@ export function useChatSection(room: RoomRecord | null) {
     room,
     user?.id ?? "",
     replyingTo,
-    clearReply
+    clearReply,
+    user
   )
 
   const { getAuthorName, getAuthorAvatar, getMessageBody } = useMessageMeta(

@@ -156,6 +156,17 @@ export default function ChatSection({
     getAuthorAvatar,
     getMessageBody,
   } = useChatSection(room)
+
+  // Deduplicate messages by ID to guarantee distinct React keys
+  const displayMessages = useMemo(() => {
+    const seen = new Set<string>()
+    return roomMessages.filter((m) => {
+      if (seen.has(m.id)) return false
+      seen.add(m.id)
+      return true
+    })
+  }, [roomMessages])
+
   const isExploringChannels = useAppStore((s) => s.isExploringChannels)
   const setIsExploringChannels = useAppStore((s) => s.setIsExploringChannels)
   const [isCreateRoomOpen, setIsCreateRoomOpen] = useState(false)
@@ -524,7 +535,7 @@ export default function ChatSection({
                       Loading sketchbook entries...
                     </div>
                   )}
-                  {!isLoading && roomMessages.length === 0 && (
+                  {!isLoading && displayMessages.length === 0 && (
                     <div className="flex flex-col items-center justify-center py-12 text-center select-none space-y-2">
                       <div className="flex h-12 w-12 items-center justify-center rounded-[var(--radius-sketch-md)] bg-paper-subtle border border-line text-ink-muted mb-1">
                         <IconMessageReply size={22} className="opacity-70" />
@@ -533,7 +544,7 @@ export default function ChatSection({
                       <div className="text-xs text-ink-muted max-w-xs">Be the first to leave a message in this channel.</div>
                     </div>
                   )}
-                  {roomMessages.map((message) => {
+                  {displayMessages.map((message) => {
                     const isSystemMessage =
                       message.type === "SYSTEM" ||
                       message.sender === "SYSTEM" ||
@@ -582,6 +593,7 @@ export default function ChatSection({
                         attachments={message.attachments}
                         timestamp={formatMessageTime(message.createdAt)}
                         isOwn={isOwn}
+                        status={message.status}
                         canDelete={
                           isOwn &&
                           !message.isDeleted &&
@@ -774,7 +786,7 @@ export default function ChatSection({
                                 ? "Add a caption..."
                                 : `Message #${room.name}`
                       }
-                      disabled={!user || !room.members.some((m) => m.userId === user.id) || isSending}
+                      disabled={!user || !room.members.some((m) => m.userId === user.id)}
                     />
                     <InputGroupAddon>
                       <Tooltip>
@@ -782,7 +794,7 @@ export default function ChatSection({
                           <button
                             type="button"
                             onClick={() => chatFileInputRef.current?.click()}
-                            disabled={!user || !room.members.some((m) => m.userId === user.id) || isSending}
+                            disabled={!user || !room.members.some((m) => m.userId === user.id)}
                             className="rounded p-0.5 text-ink-muted transition-all hover:text-ink active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
                             aria-label="Attach file"
                           >
@@ -808,7 +820,7 @@ export default function ChatSection({
                           <button
                             type="button"
                             onClick={() => setShowEmojiPicker((prev) => !prev)}
-                            disabled={!user || !room.members.some((m) => m.userId === user.id) || isSending}
+                            disabled={!user || !room.members.some((m) => m.userId === user.id)}
                             className="rounded p-0.5 text-ink-muted transition-all hover:text-ink active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
                             aria-label="Add emoji"
                           >
@@ -837,16 +849,11 @@ export default function ChatSection({
                         disabled={
                           !user ||
                           !room.members.some((m) => m.userId === user.id) ||
-                          (!draft.trim() && !stagedAttachment) ||
-                          isSending
+                          (!draft.trim() && !stagedAttachment)
                         }
                         className="text-ink-muted hover:text-ink cursor-pointer"
                       >
-                        {isSending ? (
-                          <IconLoader2 stroke={2} height={18} width={18} className="animate-spin text-[var(--pencil-teal)]" />
-                        ) : (
-                          <IconBrandTelegram stroke={2} height={18} width={18} className="text-[var(--pencil-teal)]" />
-                        )}
+                        <IconBrandTelegram stroke={2} height={18} width={18} className="text-[var(--pencil-teal)]" />
                       </InputGroupButton>
                     </InputGroupAddon>
                   </InputGroup>
@@ -943,6 +950,7 @@ function MessageBubble({
   attachments,
   timestamp,
   isOwn = false,
+  status,
   canDelete = false,
   onReply,
   onDelete,
@@ -958,6 +966,7 @@ function MessageBubble({
   attachments?: string
   timestamp: string
   isOwn?: boolean
+  status?: "sending" | "sent" | "failed"
   canDelete?: boolean
   onReply: () => void
   onDelete: () => void
@@ -1085,9 +1094,11 @@ function MessageBubble({
             {/* Bubble Box with organic stationery contours */}
             <div
               className={`min-w-0 px-3.5 py-2 text-xs leading-relaxed sm:text-sm text-ink transition-all duration-150 shadow-2xs ${
-                isOwn
-                  ? "rounded-[14px_11px_4px_12px] border border-[var(--pencil-teal)] bg-[var(--pencil-teal-soft)]/30"
-                  : "rounded-[4px_14px_12px_11px] border border-line bg-paper-subtle"
+                status === "failed"
+                  ? "rounded-[14px_11px_4px_12px] border border-[var(--pencil-coral)] bg-[var(--pencil-coral-soft)]/20"
+                  : isOwn
+                    ? "rounded-[14px_11px_4px_12px] border border-[var(--pencil-teal)] bg-[var(--pencil-teal-soft)]/30"
+                    : "rounded-[4px_14px_12px_11px] border border-line bg-paper-subtle"
               }`}
             >
               {/* Sender Name for other users inside the bubble */}
@@ -1223,11 +1234,18 @@ function MessageBubble({
                 </div>
               ) : null}
 
-              {/* Timestamp at bottom right inside the bubble */}
-              <div className="mt-1 flex items-center justify-end gap-1 select-none">
-                <span className="text-[10px] text-ink-subtle shrink-0">
-                  {timestamp}
-                </span>
+              {/* Timestamp & Delivery Status at bottom right inside the bubble */}
+              <div className="mt-1 flex items-center justify-end gap-1.5 select-none">
+                {status === "failed" ? (
+                  <span className="flex items-center gap-1 text-[11px] font-semibold text-[var(--pencil-coral)] animate-in fade-in duration-150">
+                    <IconAlertCircle size={13} className="shrink-0 text-[var(--pencil-coral)]" />
+                    <span>Not sent</span>
+                  </span>
+                ) : (
+                  <span className="text-[10px] text-ink-subtle shrink-0">
+                    {timestamp}
+                  </span>
+                )}
               </div>
             </div>
           </div>
