@@ -6,6 +6,7 @@ on:
       - main
     paths-ignore:
       - 'apps/web/**'
+      - 'apps/web2.0/**'
       - '**/*.md'
       - '**/*.svg'
       - '**/*.png'
@@ -101,81 +102,81 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  deploy:
-    name: Deploy to EC2 via SSH
-    needs: build-and-push
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Copy Compose & Caddy Config to EC2
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          source: "docker-compose.yml,Caddyfile"
-          target: "~/OpenSpace"
-
-      - name: Deploy Docker Compose Services
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          timeout: 60s
-          command_timeout: 5m
-          script: |
-            set -e
-
-            # Ensure project directory exists and navigate into it
-            mkdir -p "$HOME/OpenSpace"
-            cd "$HOME/OpenSpace"
-
-            # Write production .env file (Safe public URIs/configs directly defined + secrets for credentials)
-            cat << 'EOF' > .env
-            NODE_ENV=production
-            API_DOMAIN=${{ secrets.API_DOMAIN || 'api.openspace.anujacharjee.com' }}
-            ACME_EMAIL=${{ secrets.ACME_EMAIL || 'me@anujacharjee.com' }}
-
-            # Serverless Databases (Sensitive)
-            REDIS_URL=${{ secrets.REDIS_URL }}
-            DATABASE_URL=${{ secrets.DATABASE_URL }}
-
-            # Frontend Allowed Origin & Cookie Settings (Public / Non-sensitive)
-            WEB_APP_URL=${{ secrets.WEB_APP_URL || 'https://openspace.anujacharjee.com' }}
-            COOKIE_DOMAIN=${{ secrets.COOKIE_DOMAIN || '.anujacharjee.com' }}
-            COOKIE_SAME_SITE=${{ secrets.COOKIE_SAME_SITE || 'lax' }}
-            ACCESS_TOKEN_COOKIE_NAME=${{ secrets.ACCESS_TOKEN_COOKIE_NAME || 'accessToken' }}
-
-            # Application Secrets (Sensitive)
-            JWT_SECRET=${{ secrets.JWT_SECRET }}
-            GATEWAY_INTERNAL_SECRET=${{ secrets.GATEWAY_INTERNAL_SECRET }}
-
-            # Pramaan OAuth (Public endpoints + Sensitive Credentials)
-            PRAMAAN_CLIENT_ID=${{ secrets.PRAMAAN_CLIENT_ID }}
-            PRAMAAN_SECRET=${{ secrets.PRAMAAN_CLIENT_SECRET || secrets.PRAMAAN_SECRET }}
-            PRAMAAN_SERVER_URL=${{ secrets.PRAMAAN_SERVER_URL || 'https://pramaan.anujacharjee.com' }}
-            CALLBACK_URL=${{ secrets.CALLBACK_URL || 'https://api.openspace.anujacharjee.com/api/v1/auth/pramaan/callback' }}
-            EOF
-
-            # 1. Stop any running legacy Collab stack and remove conflicting old containers
-            if [ -d "$HOME/Collab" ]; then
-              (cd "$HOME/Collab" && docker compose down 2>/dev/null) || true
-            fi
-            docker rm -f collab_caddy collab_api_gateway collab_http_service collab_chat_service collab_ws_service openspace_caddy openspace_api_gateway openspace_http_service openspace_chat_service openspace_ws_service 2>/dev/null || true
-
-            # 2. Login to Docker Hub (if private repo)
-            if [ -n "${{ secrets.DOCKERHUB_TOKEN }}" ]; then
-              echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME || 'anuj304' }}" --password-stdin
-            fi
-
-            # 3. Pull latest images from Docker Hub in seconds
-            docker compose pull
-
-            # 4. Recreate containers using pre-built images with zero build overhead
-            docker compose up -d --remove-orphans
-
-            # 5. Clean untagged dangling images after deployment
-            docker image prune -f || true
+#  deploy:
+#    name: Deploy to EC2 via SSH
+#    needs: build-and-push
+#    runs-on: ubuntu-latest
+#    steps:
+#      - name: Checkout Code
+#        uses: actions/checkout@v4
+#
+#      - name: Copy Compose & Caddy Config to EC2
+#        uses: appleboy/scp-action@v0.1.7
+#        with:
+#          host: ${{ secrets.EC2_HOST }}
+#          username: ${{ secrets.EC2_USER }}
+#          key: ${{ secrets.EC2_SSH_KEY }}
+#          source: "docker-compose.yml,Caddyfile"
+#          target: "~/OpenSpace"
+#
+#      - name: Deploy Docker Compose Services
+#        uses: appleboy/ssh-action@v1.2.0
+#        with:
+#          host: ${{ secrets.EC2_HOST }}
+#          username: ${{ secrets.EC2_USER }}
+#          key: ${{ secrets.EC2_SSH_KEY }}
+#          timeout: 60s
+#          command_timeout: 5m
+#          script: |
+#            set -e
+#
+#            # Ensure project directory exists and navigate into it
+#            mkdir -p "$HOME/OpenSpace"
+#            cd "$HOME/OpenSpace"
+#
+#            # Write production .env file (Safe public URIs/configs directly defined + secrets for credentials)
+#            cat << 'EOF' > .env
+#            NODE_ENV=production
+#            API_DOMAIN=${{ secrets.API_DOMAIN || 'api.openspace.anujacharjee.com' }}
+#            ACME_EMAIL=${{ secrets.ACME_EMAIL || 'me@anujacharjee.com' }}
+#
+#            # Serverless Databases (Sensitive)
+#            REDIS_URL=${{ secrets.REDIS_URL }}
+#            DATABASE_URL=${{ secrets.DATABASE_URL }}
+#
+#            # Frontend Allowed Origin & Cookie Settings (Public / Non-sensitive)
+#            WEB_APP_URL=${{ secrets.WEB_APP_URL || 'https://openspace.anujacharjee.com' }}
+#            COOKIE_DOMAIN=${{ secrets.COOKIE_DOMAIN || '.anujacharjee.com' }}
+#            COOKIE_SAME_SITE=${{ secrets.COOKIE_SAME_SITE || 'lax' }}
+#            ACCESS_TOKEN_COOKIE_NAME=${{ secrets.ACCESS_TOKEN_COOKIE_NAME || 'accessToken' }}
+#
+#            # Application Secrets (Sensitive)
+#            JWT_SECRET=${{ secrets.JWT_SECRET }}
+#            GATEWAY_INTERNAL_SECRET=${{ secrets.GATEWAY_INTERNAL_SECRET }}
+#
+#            # Pramaan OAuth (Public endpoints + Sensitive Credentials)
+#            PRAMAAN_CLIENT_ID=${{ secrets.PRAMAAN_CLIENT_ID }}
+#            PRAMAAN_SECRET=${{ secrets.PRAMAAN_CLIENT_SECRET || secrets.PRAMAAN_SECRET }}
+#            PRAMAAN_SERVER_URL=${{ secrets.PRAMAAN_SERVER_URL || 'https://pramaan.anujacharjee.com' }}
+#            CALLBACK_URL=${{ secrets.CALLBACK_URL || 'https://api.openspace.anujacharjee.com/api/v1/auth/pramaan/callback' }}
+#            EOF
+#
+#            # 1. Stop any running legacy Collab stack and remove conflicting old containers
+#            if [ -d "$HOME/Collab" ]; then
+#              (cd "$HOME/Collab" && docker compose down 2>/dev/null) || true
+#            fi
+#            docker rm -f collab_caddy collab_api_gateway collab_http_service collab_chat_service collab_ws_service openspace_caddy openspace_api_gateway openspace_http_service openspace_chat_service openspace_ws_service 2>/dev/null || true
+#
+#            # 2. Login to Docker Hub (if private repo)
+#            if [ -n "${{ secrets.DOCKERHUB_TOKEN }}" ]; then
+#              echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME || 'anuj304' }}" --password-stdin
+#            fi
+#
+#            # 3. Pull latest images from Docker Hub in seconds
+#            docker compose pull
+#
+#            # 4. Recreate containers using pre-built images with zero build overhead
+#            docker compose up -d --remove-orphans
+#
+#            # 5. Clean untagged dangling images after deployment
+#            docker image prune -f || true
