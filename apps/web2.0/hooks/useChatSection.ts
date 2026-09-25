@@ -73,21 +73,8 @@ export function formatMessageTime(value: string) {
   }).format(date)
 }
 
-// ─── useRoomPermissions ──────────────────────────────────────────────────────
-
-function useRoomPermissions(
-  room: RoomRecord | null,
-  userId: string | undefined
-) {
-  const currentRoomMember = room?.members.find((m) => m.userId === userId)
-  const canManageRoom = Boolean(
-    userId &&
-    (currentRoomMember?.role === "ADMIN" ||
-      currentRoomMember?.role === "OWNER" ||
-      room?.creatorId === userId)
-  )
-  return { canManageRoom }
-}
+import { useRoomPermissions } from "./useRoomPermissions"
+export { useRoomPermissions }
 
 // ─── useMessages ────────────────────────────────────────────────────────────
 
@@ -719,7 +706,10 @@ export function useChatSection(room: RoomRecord | null) {
   const user = useAppStore((s) => s.user)
   const setActiveRoom = useAppStore((s) => s.setActiveRoom)
 
-  const { canManageRoom } = useRoomPermissions(room, user?.id)
+  const { isOwner, isAdmin, isMember, canManageRoom } = useRoomPermissions(
+    room,
+    user?.id
+  )
   const { roomMessages, isLoading, messagesEndRef } = useMessages(
     room,
     user?.id
@@ -764,6 +754,9 @@ export function useChatSection(room: RoomRecord | null) {
   return {
     user,
     setActiveRoom,
+    isOwner,
+    isAdmin,
+    isMember,
     canManageRoom,
     roomMessages,
     roomMessagesById,

@@ -8,6 +8,7 @@ import {
   getRoomSchema,
   leaveRoomSchema,
   removeRoomMemberSchema,
+  updateRoomMemberRoleSchema,
   requestJoinRoomSchema,
   respondJoinRequestSchema,
   searchRoomsSchema,
@@ -19,6 +20,7 @@ import { editRoom } from '../controllers/room/editRoom.js';
 import { getRoom } from '../controllers/room/getRoom.js';
 import { leaveRoom } from '../controllers/room/leaveRoom.js';
 import { removeRoomMember } from '../controllers/room/removeRoomMember.js';
+import { updateRoomMemberRole } from '../controllers/room/updateRoomMemberRole.js';
 import { requestJoinRoomController } from '../controllers/room/requestJoinRoom.js';
 import { getPendingJoinRequestsController } from '../controllers/room/getPendingJoinRequests.js';
 import { respondJoinRequestController } from '../controllers/room/respondJoinRequest.js';
@@ -44,6 +46,16 @@ roomRouter.post(
 );
 roomRouter.get('/:id', validateRequest(getRoomSchema), asyncHandler(getRoom));
 roomRouter.post('/:id/members', validateRequest(addRoomMembersSchema), asyncHandler(addRoomMembers));
+roomRouter.patch(
+  '/:id/members/:memberId',
+  validateRequest(updateRoomMemberRoleSchema),
+  asyncHandler(updateRoomMemberRole),
+);
+roomRouter.patch(
+  '/:id/members/:memberId/role',
+  validateRequest(updateRoomMemberRoleSchema),
+  asyncHandler(updateRoomMemberRole),
+);
 roomRouter.delete(
   '/:id/members/:memberId',
   validateRequest(removeRoomMemberSchema),

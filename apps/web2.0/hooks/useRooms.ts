@@ -303,11 +303,26 @@ export const useRooms = () => {
     return res.data.data
   }, [])
 
+  const updateMemberRole = useCallback(
+    async (roomId: string, memberId: string, role: "ADMIN" | "MEMBER" | "OWNER") => {
+      const res = await axios.patch<{
+        data?: { room?: RoomRecord; memberId?: string; role?: string }
+      }>(
+        `${roomsApiUrl}/${roomId}/members/${memberId}`,
+        { role },
+        { withCredentials: true }
+      )
+      return res.data.data?.room ?? null
+    },
+    []
+  )
+
   return {
     createRoom,
     updateRoom,
     deleteRoom,
     leaveRoom,
+    updateMemberRole,
     addMembers,
     removeMember,
     searchRooms,

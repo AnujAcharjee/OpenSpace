@@ -44,6 +44,8 @@ import {
   IconLogout,
   IconBolt,
   IconShieldCheck,
+  IconCrown,
+  IconArrowDown,
   IconHash,
   IconSearch,
   IconPlus,
@@ -56,6 +58,7 @@ import {
 } from "@tabler/icons-react"
 import type { ChatAttachment } from "@/utils/cloudinary"
 import { wsClient } from "@/ws"
+import { PREDEFINED_TOPICS } from "@/components/ExploreChannels"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   ContextMenu,
@@ -532,7 +535,7 @@ export default function ChatSection({
                 <div className="space-y-2.5 px-3 py-3 sm:px-4">
                   {isLoading && (
                     <div className="text-center text-xs text-ink-muted py-4">
-                      Loading sketchbook entries...
+                      Loading messages...
                     </div>
                   )}
                   {!isLoading && displayMessages.length === 0 && (
@@ -876,9 +879,9 @@ export default function ChatSection({
       {/* Lightbox Modal for high-resolution image preview */}
       {lightboxMedia && (
         <Dialog open={Boolean(lightboxMedia)} onOpenChange={(open) => !open && setLightboxMedia(null)}>
-          <DialogContent className="max-w-4xl p-0 bg-paper border border-line rounded-[var(--radius-sketch-md)] overflow-hidden shadow-2xl">
-            <DialogHeader className="px-4 py-3 flex flex-row items-center justify-between border-b border-line">
-              <DialogTitle className="font-display text-sm font-semibold truncate max-w-md text-ink">
+          <DialogContent className="sm:max-w-none w-auto max-w-[92vw] max-h-[92vh] p-0 bg-paper border-2 border-line rounded-[var(--radius-sketch-md)] overflow-hidden shadow-2xl inline-flex flex-col">
+            <DialogHeader className="px-4 py-2.5 flex flex-row items-center justify-between border-b border-line shrink-0">
+              <DialogTitle className="font-display text-sm font-semibold truncate max-w-xs sm:max-w-md text-ink">
                 {lightboxMedia.name}
               </DialogTitle>
               <div className="flex items-center gap-2 pr-6">
@@ -887,18 +890,18 @@ export default function ChatSection({
                   target="_blank"
                   rel="noopener noreferrer"
                   download={lightboxMedia.name}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-sketch-sm)] text-xs font-medium bg-[var(--pencil-teal-soft)] text-[var(--pencil-teal)] hover:opacity-90 transition cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-[var(--radius-sketch-sm)] text-xs font-medium bg-[var(--pencil-teal-soft)] text-[var(--pencil-teal)] hover:opacity-90 transition cursor-pointer"
                 >
                   <IconDownload size={14} />
                   <span>Download</span>
                 </a>
               </div>
             </DialogHeader>
-            <div className="flex items-center justify-center p-3 sm:p-6 max-h-[80vh] overflow-hidden bg-paper-subtle">
+            <div className="flex items-center justify-center p-2 sm:p-3 overflow-hidden bg-paper-subtle/80 max-h-[82vh] w-auto">
               <img
                 src={lightboxMedia.url}
                 alt={lightboxMedia.name}
-                className="max-h-[72vh] w-auto max-w-full rounded-[var(--radius-sketch-sm)] object-contain shadow-md"
+                className="max-h-[76vh] max-w-[86vw] w-auto h-auto rounded-[var(--radius-sketch-sm)] object-contain shadow-sm"
               />
             </div>
           </DialogContent>
@@ -1279,50 +1282,58 @@ function MessageBubble({
 }
 
 function DialogEditRoom({ room }: { room: RoomRecord }) {
+  const user = useAppStore((s) => s.user)
+  const isOwner = Boolean(
+    user?.id &&
+    (room.creatorId === user.id ||
+      room.members.find((m) => m.userId === user.id)?.role === "OWNER")
+  )
   const { updateRoom: updateRoomRequest, deleteRoom: deleteRoomRequest } =
     useRooms()
   const [open, setOpen] = useState(false)
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [step, setStep] = useState<1 | 2>(1)
+
+  const [name, setName] = useState(room.name)
+  const [description, setDescription] = useState(room.description ?? "")
+  const [isPrivate, setIsPrivate] = useState(Boolean(room.isPrivate))
   const [avatarUrl, setAvatarUrl] = useState<string | null>(room.avatarUrl ?? null)
+  const [selectedTopics, setSelectedTopics] = useState<string[]>(room.topics ?? [])
+  const [topicInput, setTopicInput] = useState("")
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
+    setStep(1)
+    setName(room.name)
+    setDescription(room.description ?? "")
+    setIsPrivate(Boolean(room.isPrivate))
     setAvatarUrl(room.avatarUrl ?? null)
+    setSelectedTopics(room.topics ?? [])
+    setTopicInput("")
+    setError(null)
     if (fileInputRef.current) {
       fileInputRef.current.value = ""
     }
-  }, [room.id, room.avatarUrl, open])
+  }, [room.id, room.name, room.description, room.isPrivate, room.avatarUrl, room.topics, open])
 
-  const defaultValues: EditRoomFormInput = {
-    name: room.name,
-    description: room.description ?? "",
-    isPrivate: room.isPrivate ? "true" : "false",
+  const handleAddTopic = (topicToAdd?: string) => {
+    const raw = (topicToAdd ?? topicInput).trim().replace(/^#+/, "").toLowerCase()
+    if (!raw) return
+    if (!selectedTopics.includes(raw)) {
+      setSelectedTopics((prev) => [...prev, raw])
+    }
+    if (!topicToAdd) {
+      setTopicInput("")
+    }
+    if (error) setError(null)
   }
 
-  const roomFields: FieldConfig<EditRoomFormInput>[] = [
-    {
-      name: "name",
-      label: "Channel Name",
-      placeholder: "channel-name",
-      autoComplete: "off",
-    },
-    {
-      name: "description",
-      label: "Description",
-      placeholder: "What this channel is for",
-      autoComplete: "off",
-    },
-    {
-      name: "isPrivate",
-      label: "Channel Visibility",
-      fieldType: "radio",
-      options: [
-        { label: "Public", value: "false" },
-        { label: "Private", value: "true" },
-      ],
-    },
-  ]
+  const handleRemoveTopic = (topicToRemove: string) => {
+    setSelectedTopics((prev) => prev.filter((t) => t !== topicToRemove))
+  }
 
   function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
@@ -1340,27 +1351,45 @@ function DialogEditRoom({ room }: { room: RoomRecord }) {
     reader.readAsDataURL(file)
   }
 
-  async function handleUpdateRoom(data: EditRoomFormInput) {
+  async function handleUpdateRoom() {
+    if (!name.trim()) {
+      setError("Channel name is required")
+      setStep(1)
+      return
+    }
+    if (selectedTopics.length === 0) {
+      setError("At least one topic is required")
+      setStep(2)
+      return
+    }
+
+    setIsSubmitting(true)
+    setError(null)
+
     try {
       const payload: EditRoomRequest["body"] = {
-        name: data.name,
-        description: data.description,
+        name: name.trim(),
+        description: description.trim() || undefined,
         avatarUrl,
-        isPrivate: data.isPrivate === "true",
+        topics: selectedTopics,
+        isPrivate,
       }
       const updatedRoom = await updateRoomRequest(room.id, payload)
 
       useAppStore.getState().upsertRoom(updatedRoom)
       setOpen(false)
       toast.success("Channel updated", toastOptions)
-    } catch (error) {
-      const message = axios.isAxiosError(error)
-        ? (error.response?.data?.error ??
-          error.response?.data?.message ??
+    } catch (err) {
+      const message = axios.isAxiosError(err)
+        ? (err.response?.data?.error ??
+          err.response?.data?.message ??
           "Unable to update channel")
         : "Unable to update channel"
 
+      setError(message)
       toast.error(message, toastOptions)
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -1405,99 +1434,353 @@ function DialogEditRoom({ room }: { room: RoomRecord }) {
         open={open}
         onOpenChange={(val) => {
           setOpen(val)
-          setAvatarUrl(room.avatarUrl ?? null)
-          if (fileInputRef.current) {
-            fileInputRef.current.value = ""
+          if (!val) {
+            setStep(1)
+            setName(room.name)
+            setDescription(room.description ?? "")
+            setIsPrivate(Boolean(room.isPrivate))
+            setAvatarUrl(room.avatarUrl ?? null)
+            setSelectedTopics(room.topics ?? [])
+            setTopicInput("")
+            setError(null)
+            if (fileInputRef.current) {
+              fileInputRef.current.value = ""
+            }
           }
         }}
       >
         <DialogTrigger asChild>
           <button
             type="button"
-            className="flex items-center justify-center rounded-[var(--radius-sketch-sm)] p-1.5 text-ink-muted transition-all duration-150 hover:bg-surface-hover hover:text-ink active:scale-95"
+            className="flex items-center justify-center rounded-[var(--radius-sketch-sm)] p-1.5 text-ink-muted transition-all duration-150 hover:bg-surface-hover hover:text-ink active:scale-95 cursor-pointer"
             aria-label="Edit channel"
           >
             <IconDotsVertical size={18} stroke={2} />
           </button>
         </DialogTrigger>
 
-        <DialogContent className="sm:max-w-md rounded-[var(--radius-sketch-md)]">
-          <DialogHeader>
-            <DialogTitle className="font-display text-lg font-semibold">Edit Channel</DialogTitle>
-            <DialogDescription className="text-xs text-ink-muted">
-              Update the channel name, description, avatar, or visibility.
+        <DialogContent className="sm:max-w-md max-h-[85vh] flex flex-col gap-0 p-0 overflow-hidden rounded-[var(--radius-sketch-md)]">
+          <DialogHeader className="px-5 pt-3.5 pb-2.5 border-b border-line shrink-0 pr-12">
+            <DialogTitle className="font-display text-base font-semibold">
+              Edit Channel
+            </DialogTitle>
+            <DialogDescription className="sr-only">
+              Edit channel details
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-3">
-            <div className="flex flex-col items-center justify-center gap-2 pt-1 pb-1">
-              <Avatar className="h-16 w-16 border-2 border-line shadow-sm">
-                <AvatarImage src={avatarUrl ?? undefined} />
-                <AvatarFallback className="bg-paper-dark text-lg font-bold text-ink-muted">
-                  <IconPhoto size={28} />
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex items-center gap-2">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleFileChange}
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-7 text-xs rounded-[var(--radius-sketch-sm)] cursor-pointer"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  Change Channel Icon
-                </Button>
-                {avatarUrl && (
+          <div className="flex-1 overflow-y-auto px-5 py-3.5 space-y-3.5 scrollbar-thin">
+            {step === 1 ? (
+              <>
+                {/* Avatar Section */}
+                <div className="flex flex-col items-center justify-center gap-1.5 pb-0.5">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleFileChange}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="group relative cursor-pointer rounded-full outline-none focus:ring-2 focus:ring-[var(--pencil-teal)] transition-all"
+                    title="Click to choose channel image"
+                  >
+                    <Avatar className="h-14 w-14 border-2 border-line group-hover:border-[var(--pencil-teal)] shadow-sm transition-colors">
+                      <AvatarImage src={avatarUrl ?? undefined} />
+                      <AvatarFallback className="bg-paper-dark text-base font-bold text-ink-muted group-hover:text-ink transition-colors">
+                        <IconPhoto size={24} />
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/35 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <IconPhoto size={20} className="text-white drop-shadow" />
+                    </div>
+                  </button>
+                  {avatarUrl && (
+                    <button
+                      type="button"
+                      className="text-[11px] text-[var(--pencil-coral)] hover:underline cursor-pointer transition-colors"
+                      onClick={() => {
+                        setAvatarUrl(null)
+                        if (fileInputRef.current) {
+                          fileInputRef.current.value = ""
+                        }
+                      }}
+                    >
+                      Remove image
+                    </button>
+                  )}
+                </div>
+
+                {/* Channel Name */}
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-ink font-display">
+                    Channel Name <span className="text-[var(--pencil-coral)]">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => {
+                      setName(e.target.value)
+                      if (error) setError(null)
+                    }}
+                    placeholder="channel-name"
+                    className="h-8.5 w-full rounded-[var(--radius-sketch-sm)] border border-line bg-paper px-3 text-xs text-ink placeholder:text-ink-subtle outline-none focus:border-[var(--pencil-teal)] focus:ring-1 focus:ring-[var(--pencil-teal-soft)] transition-all"
+                  />
+                </div>
+
+                {/* Description */}
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-ink font-display">
+                    Description <span className="text-[11px] text-ink-muted font-normal">(optional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="What this channel is for"
+                    className="h-8.5 w-full rounded-[var(--radius-sketch-sm)] border border-line bg-paper px-3 text-xs text-ink placeholder:text-ink-subtle outline-none focus:border-[var(--pencil-teal)] focus:ring-1 focus:ring-[var(--pencil-teal-soft)] transition-all"
+                  />
+                </div>
+
+                {/* Visibility */}
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-ink font-display">
+                    Channel Visibility
+                  </label>
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-2 text-xs font-medium text-ink cursor-pointer">
+                      <input
+                        type="radio"
+                        name="edit-room-visibility"
+                        checked={!isPrivate}
+                        onChange={() => setIsPrivate(false)}
+                        className="accent-[var(--pencil-teal)] cursor-pointer"
+                      />
+                      Public
+                    </label>
+                    <label className="flex items-center gap-2 text-xs font-medium text-ink cursor-pointer">
+                      <input
+                        type="radio"
+                        name="edit-room-visibility"
+                        checked={isPrivate}
+                        onChange={() => setIsPrivate(true)}
+                        className="accent-[var(--pencil-teal)] cursor-pointer"
+                      />
+                      Private
+                    </label>
+                  </div>
+                </div>
+
+                {/* Topics Preview & Edit Topics Button */}
+                <div className="space-y-1.5 rounded-[var(--radius-sketch-sm)] border border-line bg-paper-subtle/30 p-2.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-ink font-display flex items-center gap-1.5">
+                      <IconHash size={14} className="text-[var(--pencil-teal)]" />
+                      <span>Channel Topics</span>
+                      <span className="text-[var(--pencil-coral)] text-xs">*</span>
+                    </label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        if (!name.trim()) {
+                          setError("Channel name is required")
+                          return
+                        }
+                        setError(null)
+                        setStep(2)
+                      }}
+                      className="h-6 px-2.5 text-[11px] font-medium border-line text-ink hover:border-[var(--pencil-teal)] hover:text-[var(--pencil-teal)] rounded-[var(--radius-sketch-sm)] cursor-pointer"
+                    >
+                      Edit Topics
+                    </Button>
+                  </div>
+
+                  {selectedTopics.length > 0 ? (
+                    <div className="flex flex-wrap gap-1 max-h-16 overflow-y-auto scrollbar-ultra-thin">
+                      {selectedTopics.map((topic) => (
+                        <span
+                          key={topic}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[var(--radius-sketch-sm)] text-[10px] font-semibold bg-[var(--pencil-teal)] text-white shadow-2xs"
+                        >
+                          {topic}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-[var(--pencil-coral)] font-medium">
+                      No topics selected. Minimum 1 topic is required.
+                    </p>
+                  )}
+                </div>
+
+                {error && (
+                  <p className="text-xs text-[var(--pencil-coral)] font-medium">
+                    {error}
+                  </p>
+                )}
+
+                {/* Actions on Step 1 */}
+                <div className="space-y-2 pt-1">
                   <Button
                     type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 px-2 text-xs text-[var(--pencil-coral)] hover:bg-[var(--pencil-coral-soft)] cursor-pointer"
-                    onClick={() => {
-                      setAvatarUrl(null)
-                      if (fileInputRef.current) {
-                        fileInputRef.current.value = ""
-                      }
-                    }}
+                    disabled={isSubmitting || !name.trim() || selectedTopics.length === 0}
+                    onClick={() => void handleUpdateRoom()}
+                    className="w-full h-8.5 rounded-[var(--radius-sketch-sm)] bg-[var(--pencil-teal)] hover:bg-[var(--pencil-teal)]/90 text-white font-semibold text-xs shadow-2xs cursor-pointer disabled:opacity-50"
                   >
-                    <IconTrash size={14} className="mr-1" /> Remove
+                    {isSubmitting ? "Saving..." : "Save"}
                   </Button>
+                  {selectedTopics.length === 0 && (
+                    <p className="text-[10px] text-center text-[var(--pencil-coral)] font-medium">
+                      At least one topic is required before saving. Click "Edit Topics" above.
+                    </p>
+                  )}
+                  {isOwner && (
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      className="w-full h-8 text-xs rounded-[var(--radius-sketch-sm)] cursor-pointer"
+                      onClick={handleOpenDeleteConfirmation}
+                    >
+                      Delete channel
+                    </Button>
+                  )}
+                </div>
+              </>
+            ) : (
+              <>
+                {/* Step 2: Topics Update */}
+                <div className="space-y-3">
+                  {/* Selected Topics List */}
+                  {selectedTopics.length > 0 && (
+                    <div className="space-y-1">
+                      <span className="text-[10px] uppercase tracking-wider font-semibold text-ink-subtle block">
+                        Selected topics ({selectedTopics.length})
+                      </span>
+                      <div className="flex flex-wrap gap-1 p-1.5 rounded-[var(--radius-sketch-sm)] border border-line/60 bg-paper max-h-24 overflow-y-auto scrollbar-ultra-thin">
+                        {selectedTopics.map((topic) => (
+                          <span
+                            key={topic}
+                            className="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-[var(--radius-sketch-sm)] text-[11px] font-semibold bg-[var(--pencil-teal)] text-white shadow-2xs"
+                          >
+                            <span>{topic}</span>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveTopic(topic)}
+                              className="rounded-full p-0.5 hover:bg-black/20 text-white/90 hover:text-white cursor-pointer transition-colors"
+                              title={`Remove ${topic}`}
+                            >
+                              <IconX size={12} stroke={2.5} />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Min 1 required message beside Add topic label in brackets */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-1 text-[11px]">
+                      <span className="text-ink-subtle font-medium">Add topic</span>
+                      <span
+                        className={
+                          selectedTopics.length === 0
+                            ? "text-[var(--pencil-coral)] font-medium"
+                            : "text-ink-subtle"
+                        }
+                      >
+                        (min 1 required)
+                      </span>
+                    </div>
+
+                    {/* Add Custom Topic Input + Button */}
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="text"
+                        value={topicInput}
+                        onChange={(e) => setTopicInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault()
+                            handleAddTopic()
+                          }
+                        }}
+                        placeholder="Type topic name (e.g. dev, design)..."
+                        className="h-8 flex-1 px-3 rounded-[var(--radius-sketch-sm)] border border-line bg-paper text-xs text-ink placeholder:text-ink-subtle outline-none focus:border-[var(--pencil-teal)] focus:ring-1 focus:ring-[var(--pencil-teal-soft)] transition-all"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleAddTopic()}
+                        disabled={!topicInput.trim()}
+                        className="h-8 px-3 text-xs font-medium border-line text-ink hover:border-[var(--pencil-teal)] hover:text-[var(--pencil-teal)] rounded-[var(--radius-sketch-sm)] cursor-pointer disabled:opacity-40 shrink-0"
+                      >
+                        Add
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Topics List (no Suggested topics message, no + and no # signs) */}
+                  <div className="flex flex-wrap gap-1 max-h-32 overflow-y-auto p-2 rounded-[var(--radius-sketch-sm)] border border-line/50 bg-paper/60 scrollbar-ultra-thin">
+                    {PREDEFINED_TOPICS.map((topic) => {
+                      const normalized = topic.toLowerCase()
+                      const isAdded = selectedTopics.includes(normalized)
+                      return (
+                        <button
+                          key={topic}
+                          type="button"
+                          onClick={() => {
+                            if (isAdded) {
+                              handleRemoveTopic(normalized)
+                            } else {
+                              handleAddTopic(normalized)
+                            }
+                          }}
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-[var(--radius-sketch-sm)] text-[10px] font-medium transition-all cursor-pointer ${
+                            isAdded
+                              ? "bg-[var(--pencil-teal)] text-white shadow-2xs font-semibold"
+                              : "bg-paper border border-line text-ink-muted hover:text-ink hover:border-line-strong"
+                          }`}
+                        >
+                          <span>{topic}</span>
+                          {isAdded && <span className="text-[9px]">✓</span>}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {error && (
+                  <p className="text-xs text-[var(--pencil-coral)] font-medium">
+                    {error}
+                  </p>
                 )}
-              </div>
-            </div>
 
-            <AppForm
-              key={`${room.id}-${room.updatedAt}-${open}`}
-              formId={`edit-room-form-${room.id}`}
-              schema={editRoomFormSchema}
-              defaultValues={{
-                name: room.name,
-                description: room.description ?? "",
-                isPrivate: room.isPrivate ? ("true" as const) : ("false" as const),
-              }}
-              fields={roomFields}
-              onSubmit={async (data) => {
-                await handleUpdateRoom(data as EditRoomFormInput)
-              }}
-              submitLabel="Save changes"
-              pendingLabel="Saving changes..."
-            />
-
-            <Button
-              type="button"
-              variant="destructive"
-              className="w-full rounded-[var(--radius-sketch-sm)]"
-              onClick={handleOpenDeleteConfirmation}
-            >
-              Delete channel
-            </Button>
+                {/* Submit Buttons */}
+                <div className="pt-2 flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setStep(1)}
+                    className="flex-1 h-8.5 rounded-[var(--radius-sketch-sm)] border-line text-xs font-semibold cursor-pointer"
+                  >
+                    Back
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => void handleUpdateRoom()}
+                    disabled={isSubmitting || selectedTopics.length === 0 || !name.trim()}
+                    className="flex-1 h-8.5 rounded-[var(--radius-sketch-sm)] bg-[var(--pencil-teal)] hover:bg-[var(--pencil-teal)]/90 text-white font-semibold text-xs shadow-2xs cursor-pointer disabled:opacity-50"
+                  >
+                    {isSubmitting ? "Saving..." : "Save"}
+                  </Button>
+                </div>
+              </>
+            )}
           </div>
         </DialogContent>
       </Dialog>
@@ -1559,6 +1842,7 @@ function RoomMembersPanel({
     getPendingJoinRequests: getPendingJoinRequestsRequest,
     respondJoinRequest: respondJoinRequestRequest,
     leaveRoom: leaveRoomRequest,
+    updateMemberRole: updateMemberRoleRequest,
   } = useRooms()
 
   const pendingRequests = useAppStore(
@@ -1571,6 +1855,13 @@ function RoomMembersPanel({
   const [removeTarget, setRemoveTarget] = useState<RoomMemberRecord | null>(
     null
   )
+  const [transferTarget, setTransferTarget] = useState<RoomMemberRecord | null>(
+    null
+  )
+  const [isTransferring, setIsTransferring] = useState(false)
+  const [updatingRoleMemberId, setUpdatingRoleMemberId] = useState<string | null>(
+    null
+  )
   const [confirmLeaveOpen, setConfirmLeaveOpen] = useState(false)
   const [isLeaving, setIsLeaving] = useState(false)
   const [isLoadingPending, setIsLoadingPending] = useState(false)
@@ -1580,6 +1871,66 @@ function RoomMembersPanel({
   const [usernamesInput, setUsernamesInput] = useState("")
   const [isAdding, setIsAdding] = useState(false)
   const [isRemoving, setIsRemoving] = useState(false)
+
+  const currentMember = room.members.find((m) => m.userId === currentUserId)
+  const isActorSuperAdmin = Boolean(
+    currentUserId &&
+    (currentMember?.role === "OWNER" || room.creatorId === currentUserId)
+  )
+  const isActorAdmin = Boolean(
+    currentUserId && currentMember?.role === "ADMIN"
+  )
+  const otherMembers = room.members.filter((m) => m.userId !== currentUserId)
+  const cannotLeaveAsSuperAdmin = isActorSuperAdmin && otherMembers.length > 0
+
+  async function handleUpdateMemberRole(
+    member: RoomMemberRecord,
+    newRole: "ADMIN" | "MEMBER"
+  ) {
+    if (updatingRoleMemberId) return
+    setUpdatingRoleMemberId(member.id)
+    try {
+      const updatedRoom = await updateMemberRoleRequest(room.id, member.id, newRole)
+      if (updatedRoom) {
+        useAppStore.getState().upsertRoom(updatedRoom)
+      }
+      const displayName = member.user?.username ?? "user"
+      toast.success(
+        newRole === "ADMIN"
+          ? `Assigned @${displayName} as admin`
+          : `Demoted @${displayName} to member`,
+        toastOptions
+      )
+    } catch (err) {
+      const msg = axios.isAxiosError(err)
+        ? (err.response?.data?.error ?? err.response?.data?.message ?? "Unable to update member role")
+        : "Unable to update member role"
+      toast.error(msg, toastOptions)
+    } finally {
+      setUpdatingRoleMemberId(null)
+    }
+  }
+
+  async function handleTransferSuperAdmin() {
+    if (!transferTarget || isTransferring) return
+    setIsTransferring(true)
+    try {
+      const updatedRoom = await updateMemberRoleRequest(room.id, transferTarget.id, "OWNER")
+      if (updatedRoom) {
+        useAppStore.getState().upsertRoom(updatedRoom)
+      }
+      const displayName = transferTarget.user?.username ?? "user"
+      toast.success(`Transferred Super Admin to @${displayName}`, toastOptions)
+      setTransferTarget(null)
+    } catch (err) {
+      const msg = axios.isAxiosError(err)
+        ? (err.response?.data?.error ?? err.response?.data?.message ?? "Unable to transfer ownership")
+        : "Unable to transfer ownership"
+      toast.error(msg, toastOptions)
+    } finally {
+      setIsTransferring(false)
+    }
+  }
 
   useEffect(() => {
     if (!canManageRoom || !currentUserId) {
@@ -1833,19 +2184,31 @@ function RoomMembersPanel({
             )}
 
             {room.members.map((member) => {
-              const displayName = member.user?.username ?? "Unknown user"
+              const displayName = member.user?.username ?? member.user?.name ?? "Unknown user"
+              const isSelf = member.userId === currentUserId
+              const isTargetSuperAdmin =
+                member.role === "OWNER" || room.creatorId === member.userId
+              const isTargetAdmin = !isTargetSuperAdmin && member.role === "ADMIN"
+              const isTargetMember = !isTargetSuperAdmin && !isTargetAdmin
+
+              const canMakeAdmin =
+                (isActorSuperAdmin || isActorAdmin) && isTargetMember && !isSelf
+              const canDemoteAdmin =
+                isActorSuperAdmin && isTargetAdmin && !isSelf
+              const canTransferSuperAdmin =
+                isActorSuperAdmin && !isTargetSuperAdmin && !isSelf
               const canRemove =
-                canManageRoom &&
-                member.role !== "OWNER" &&
-                member.userId !== currentUserId
+                !isSelf &&
+                !isTargetSuperAdmin &&
+                (isActorSuperAdmin || (isActorAdmin && isTargetMember))
 
               return (
                 <div
                   key={member.id}
-                  className="flex items-center justify-between rounded-[var(--radius-sketch-sm)] border border-line bg-paper px-2.5 py-1.5"
+                  className="flex items-center justify-between rounded-[var(--radius-sketch-sm)] border border-line bg-paper px-2.5 py-1.5 gap-2"
                 >
                   <div className="flex min-w-0 items-center gap-2">
-                    <Avatar className="h-7 w-7">
+                    <Avatar className="h-7 w-7 shrink-0">
                       <AvatarImage
                         src={member.user?.avatarUrl ?? undefined}
                         alt={displayName}
@@ -1855,24 +2218,92 @@ function RoomMembersPanel({
                       </AvatarFallback>
                     </Avatar>
                     <div className="min-w-0">
-                      <div className="truncate text-xs font-semibold text-ink">{displayName}</div>
-                      <div className="text-[10px] text-ink-muted">
-                        {member.role}
+                      <div className="flex items-center gap-1.5">
+                        <span className="truncate text-xs font-semibold text-ink">
+                          {displayName}
+                        </span>
+                        {isSelf && (
+                          <span className="text-[10px] text-ink-subtle font-normal">
+                            (you)
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-0.5">
+                        {isTargetSuperAdmin ? (
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-semibold bg-[var(--pencil-yellow-soft)] text-[var(--pencil-yellow)] border border-[var(--pencil-yellow)]/40">
+                            <IconCrown size={10} stroke={2.5} />
+                            <span>Super Admin</span>
+                          </span>
+                        ) : isTargetAdmin ? (
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-semibold bg-[var(--pencil-blue-soft)] text-[var(--pencil-blue)] border border-[var(--pencil-blue)]/40">
+                            <IconShieldCheck size={10} stroke={2.5} />
+                            <span>Admin</span>
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-ink-muted">Member</span>
+                        )}
                       </div>
                     </div>
                   </div>
 
-                  {canRemove && (
-                    <Button
-                      type="button"
-                      size="icon-xs"
-                      variant="ghost"
-                      className="text-[var(--pencil-coral)] hover:text-[var(--pencil-coral)] hover:bg-[var(--pencil-coral-soft)] cursor-pointer"
-                      onClick={() => setRemoveTarget(member)}
-                    >
-                      <IconUserMinus size={14} />
-                    </Button>
-                  )}
+                  <div className="flex items-center gap-1 shrink-0">
+                    {canMakeAdmin && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-6 px-1.5 text-[10px] font-medium rounded-[var(--radius-sketch-sm)] border border-[var(--pencil-teal)]/40 bg-paper hover:bg-[var(--pencil-teal-soft)] text-[var(--pencil-teal)] hover:border-[var(--pencil-teal)] cursor-pointer"
+                        title="Make Admin"
+                        disabled={updatingRoleMemberId === member.id}
+                        onClick={() => void handleUpdateMemberRole(member, "ADMIN")}
+                      >
+                        <IconShieldCheck size={12} className="mr-1" />
+                        <span>{updatingRoleMemberId === member.id ? "..." : "Make Admin"}</span>
+                      </Button>
+                    )}
+
+                    {canDemoteAdmin && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-6 px-1.5 text-[10px] font-medium rounded-[var(--radius-sketch-sm)] border border-line text-ink-muted hover:text-ink hover:bg-surface-hover cursor-pointer"
+                        title="Demote to Member"
+                        disabled={updatingRoleMemberId === member.id}
+                        onClick={() => void handleUpdateMemberRole(member, "MEMBER")}
+                      >
+                        <IconArrowDown size={12} className="mr-0.5" />
+                        <span>{updatingRoleMemberId === member.id ? "..." : "Demote"}</span>
+                      </Button>
+                    )}
+
+                    {canTransferSuperAdmin && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-6 px-1.5 text-[10px] font-medium rounded-[var(--radius-sketch-sm)] border border-[var(--pencil-yellow)]/50 bg-[var(--pencil-yellow-soft)]/20 hover:bg-[var(--pencil-yellow-soft)] text-[var(--pencil-yellow)] cursor-pointer"
+                        title="Transfer Super Admin ownership"
+                        onClick={() => setTransferTarget(member)}
+                      >
+                        <IconCrown size={11} className="mr-1" stroke={2.5} />
+                        <span>Make Super Admin</span>
+                      </Button>
+                    )}
+
+                    {canRemove && (
+                      <Button
+                        type="button"
+                        size="icon-xs"
+                        variant="ghost"
+                        className="text-[var(--pencil-coral)] hover:text-[var(--pencil-coral)] hover:bg-[var(--pencil-coral-soft)] cursor-pointer"
+                        title="Remove member"
+                        onClick={() => setRemoveTarget(member)}
+                      >
+                        <IconUserMinus size={14} />
+                      </Button>
+                    )}
+                  </div>
                 </div>
               )
             })}
@@ -1902,6 +2333,46 @@ function RoomMembersPanel({
       />
 
       <Dialog
+        open={Boolean(transferTarget)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setTransferTarget(null)
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md rounded-[var(--radius-sketch-md)]">
+          <DialogHeader>
+            <DialogTitle className="font-display text-base font-bold text-ink">
+              Transfer Super Admin?
+            </DialogTitle>
+            <DialogDescription className="text-xs text-ink-muted leading-relaxed">
+              Are you sure you want to make @{transferTarget?.user?.username ?? "this member"} the Super Admin of #{room.name}? You will automatically become an Admin. Each room must always have exactly one Super Admin.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="flex-1 rounded-[var(--radius-sketch-sm)] text-xs"
+              onClick={() => setTransferTarget(null)}
+              disabled={isTransferring}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              className="flex-1 rounded-[var(--radius-sketch-sm)] text-xs font-semibold bg-[var(--pencil-yellow)] hover:bg-[var(--pencil-yellow)]/90 text-white shadow-2xs"
+              disabled={isTransferring}
+              onClick={() => void handleTransferSuperAdmin()}
+            >
+              {isTransferring ? "Transferring..." : "Confirm Transfer"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
         open={confirmLeaveOpen}
         onOpenChange={(open) => {
           if (!open) {
@@ -1912,9 +2383,15 @@ function RoomMembersPanel({
         <DialogContent className="sm:max-w-md rounded-[var(--radius-sketch-md)]">
           <DialogHeader>
             <DialogTitle className="font-display text-base font-bold text-ink">Leave Channel?</DialogTitle>
-            <DialogDescription className="text-xs text-ink-muted">
-              Are you sure you want to leave #{room.name}? You will need to rejoin to access messages if it is private.
-            </DialogDescription>
+            {cannotLeaveAsSuperAdmin ? (
+              <div className="rounded-[var(--radius-sketch-sm)] border border-[var(--pencil-coral)]/40 bg-[var(--pencil-coral-soft)]/30 p-2.5 text-xs text-[var(--pencil-coral)] leading-relaxed">
+                You are the Super Admin of this channel. You cannot leave without assigning another Super Admin first, or you must delete the channel.
+              </div>
+            ) : (
+              <DialogDescription className="text-xs text-ink-muted">
+                Are you sure you want to leave #{room.name}? You will need to rejoin to access messages if it is private.
+              </DialogDescription>
+            )}
           </DialogHeader>
 
           <div className="flex gap-2">
@@ -1931,8 +2408,9 @@ function RoomMembersPanel({
               type="button"
               variant="destructive"
               className="flex-1 rounded-[var(--radius-sketch-sm)] text-xs font-semibold"
+              disabled={isLeaving || cannotLeaveAsSuperAdmin}
               onClick={async () => {
-                if (isLeaving) return
+                if (isLeaving || cannotLeaveAsSuperAdmin) return
                 setIsLeaving(true)
                 try {
                   await leaveRoomRequest(room.id, currentUserId ?? undefined)
@@ -1954,7 +2432,6 @@ function RoomMembersPanel({
                   setIsLeaving(false)
                 }
               }}
-              disabled={isLeaving}
             >
               {isLeaving ? "Leaving..." : "Confirm leave"}
             </Button>

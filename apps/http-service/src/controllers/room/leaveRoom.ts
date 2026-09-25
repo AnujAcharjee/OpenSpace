@@ -1,7 +1,7 @@
 import type { Request, Response } from 'express';
 import type { LeaveRoomRequest as LeaveRoomInput } from '@repo/validation';
 import { v4 as uuidv4 } from 'uuid';
-import { MessageType, prisma } from '@repo/db';
+import { MessageType, prisma, RoomMemberRole } from '@repo/db';
 import { logger } from '../../lib/logger.js';
 import { redis } from '../../lib/redis.js';
 import { toRoomRecord } from '../@helpers.js';
@@ -35,6 +35,18 @@ export const leaveRoom = async (req: Request, res: Response) => {
 
   if (!existingMember) {
     throw new AppError('You are not a member of this room', 400);
+  }
+
+  // Super Admin protection: cannot leave if other members remain without transferring Super Admin
+  const isSuperAdmin =
+    existingMember.role === RoomMemberRole.OWNER || room.creatorId === userId;
+  const otherMembers = room.members.filter((member) => member.userId !== userId);
+
+  if (isSuperAdmin && otherMembers.length > 0) {
+    throw new AppError(
+      'You are the Super Admin of this channel. You cannot leave without assigning another Super Admin first, or you must delete the channel.',
+      400,
+    );
   }
 
   // Delete the membership
@@ -106,7 +118,18 @@ export const leaveRoom = async (req: Request, res: Response) => {
     await redis.publish(`user:${userId}`, JSON.stringify(removalPayload));
     await redis.publish(`room:${roomId}`, JSON.stringify(removalPayload));
 
-    // 3. Evict from Redis membership cache
+    // 3. Broadcast room_updated with updated room record
+    if (updatedRoom) {
+      await redis.publish(
+        `room:${roomId}`,
+        JSON.stringify({
+          type: 'room_updated',
+          payload: { room: toRoomRecord(updatedRoom) },
+        }),
+      );
+    }
+
+    // 4. Evict from Redis membership cache
     await redis.srem(`room:${roomId}:members`, userId);
   } catch (publishError) {
     logger.error({ publishError, roomId, userId }, 'Leave room WS publish failed');

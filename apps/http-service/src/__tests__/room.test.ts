@@ -400,7 +400,7 @@ describe('HTTP Service - Room Search & Join', () => {
         where: { id: 'm-2' },
       });
       expect(mockRedis.srem).toHaveBeenCalledWith(`room:${roomId}:members`, userId);
-      expect(mockRedis.publish).toHaveBeenCalledTimes(3);
+      expect(mockRedis.publish).toHaveBeenCalledTimes(4);
       expect(res.status).toHaveBeenCalledWith(200);
       expect(res.json).toHaveBeenCalledWith(
         expect.objectContaining({

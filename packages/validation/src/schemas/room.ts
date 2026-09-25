@@ -162,6 +162,18 @@ export const removeRoomMemberSchema = z.object({
 
 export type RemoveRoomMemberRequest = z.infer<typeof removeRoomMemberSchema>;
 
+export const updateRoomMemberRoleSchema = z.object({
+  params: z.object({
+    id: uuidSchema('id must be a valid UUID'),
+    memberId: uuidSchema('memberId must be a valid UUID'),
+  }),
+  body: z.object({
+    role: z.enum(['MEMBER', 'ADMIN', 'OWNER']),
+  }),
+});
+
+export type UpdateRoomMemberRoleRequest = z.infer<typeof updateRoomMemberRoleSchema>;
+
 export const leaveRoomSchema = z.object({
   params: z.object({
     id: uuidSchema('id must be a valid UUID'),

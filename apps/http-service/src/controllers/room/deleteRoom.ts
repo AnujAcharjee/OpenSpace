@@ -1,11 +1,16 @@
 import type { Request, Response } from 'express';
 import type { DeleteRoomRequest as DeleteRoomInput } from '@repo/validation';
-import { prisma, Prisma } from '@repo/db';
+import { prisma, Prisma, RoomMemberRole } from '@repo/db';
 import { redis } from '../../lib/redis.js';
 import { AppError } from '../../utils/appError.js';
 
 export const deleteRoom = async (req: Request, res: Response) => {
   const { id } = req.params as DeleteRoomInput['params'];
+  const actorUserId = req.user?.id;
+
+  if (!actorUserId) {
+    throw new AppError('Authenticated user is required', 401);
+  }
 
   try {
     const room = await prisma.chatRoom.findUnique({
@@ -17,6 +22,14 @@ export const deleteRoom = async (req: Request, res: Response) => {
 
     if (!room) {
       throw new AppError('Room not found', 404);
+    }
+
+    const actorMember = room.members.find((m) => m.userId === actorUserId);
+    const isSuperAdmin =
+      actorMember?.role === RoomMemberRole.OWNER || room.creatorId === actorUserId;
+
+    if (!isSuperAdmin) {
+      throw new AppError('Only the Super Admin can delete this channel', 403);
     }
 
     const memberUserIds = room.members.map((m) => m.userId);

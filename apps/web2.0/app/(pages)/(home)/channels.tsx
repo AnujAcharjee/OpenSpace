@@ -19,6 +19,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -37,6 +38,9 @@ import {
   IconTrash,
   IconX,
   IconHash,
+  IconPlus,
+  IconChevronLeft,
+  IconAlertCircle,
 } from "@tabler/icons-react"
 import {
   Tooltip,
@@ -543,7 +547,7 @@ export default function ChannelsSection() {
                   </div>
                   <p className="font-display text-xs font-semibold text-ink">Channels Locked</p>
                   <p className="text-[11px] text-ink-muted max-w-[200px] leading-relaxed">
-                    Sign in to open your sketchbook and view active conversations.
+                    Sign in to join channels and view active conversations.
                   </p>
                 </div>
               ) : myRooms.length === 0 ? (
@@ -628,6 +632,17 @@ function ListItems({
   const [confirmLeaveOpen, setConfirmLeaveOpen] = useState(false)
   const [isLeaving, setIsLeaving] = useState(false)
 
+  const currentMember = room.members.find((m) => m.userId === currentUserId)
+  const isCurrentAdmin =
+    currentMember?.role === "ADMIN" ||
+    currentMember?.role === "OWNER" ||
+    room.creatorId === currentUserId
+  const otherMembers = room.members.filter((m) => m.userId !== currentUserId)
+  const otherAdmins = otherMembers.filter(
+    (m) => m.role === "ADMIN" || m.role === "OWNER"
+  )
+  const isLastAdmin = isCurrentAdmin && otherMembers.length > 0 && otherAdmins.length === 0
+
   const lastMessageText = room.lastMessage
     ? room.lastMessage.text?.trim() || "Attachment"
     : ""
@@ -692,7 +707,7 @@ function ListItems({
                 {room.name}
               </div>
               {lastMessageTime && (
-                <span className={`shrink-0 text-[10px] ${unread && !isActive ? "font-semibold text-[var(--pencil-coral)]" : "text-ink-subtle"}`}>
+                <span className={`shrink-0 text-[10px] ${unread && !isActive ? "font-semibold text-[var(--pencil-green)]" : "text-ink-subtle"}`}>
                   {lastMessageTime}
                 </span>
               )}
@@ -715,7 +730,7 @@ function ListItems({
           {isPinned && <IconPinned size={14} className="text-[var(--pencil-yellow)]" />}
           {isMuted && <IconVolume3 size={14} className="text-ink-subtle" />}
           {unread && unreadCount > 0 && !isActive && (
-            <div className="flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-[var(--pencil-coral)] px-1 text-[10px] font-bold text-white shadow-2xs">
+            <div className="flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-[var(--pencil-green)] px-1.5 text-[10px] font-bold text-white shadow-2xs">
               {unreadCount > 99 ? "99+" : unreadCount}
             </div>
           )}
@@ -827,9 +842,15 @@ function ListItems({
             <DialogTitle className="font-display text-base font-bold text-ink">
               Leave #{room.name}?
             </DialogTitle>
-            <div className="text-xs text-ink-muted leading-relaxed">
-              Are you sure you want to leave <span className="font-semibold text-ink">#{room.name}</span>? You will no longer receive or send messages here unless you join again.
-            </div>
+            {isLastAdmin ? (
+              <div className="rounded-[var(--radius-sketch-sm)] border border-[var(--pencil-coral)]/40 bg-[var(--pencil-coral-soft)]/30 p-2.5 text-xs text-[var(--pencil-coral)] leading-relaxed">
+                You are the only admin in this channel. You cannot leave without assigning another admin first or deleting the channel.
+              </div>
+            ) : (
+              <div className="text-xs text-ink-muted leading-relaxed">
+                Are you sure you want to leave <span className="font-semibold text-ink">#{room.name}</span>? You will no longer receive or send messages here unless you join again.
+              </div>
+            )}
           </DialogHeader>
 
           <div className="flex items-center justify-end gap-2 pt-3 border-t border-line">
@@ -847,7 +868,7 @@ function ListItems({
               type="button"
               variant="destructive"
               size="sm"
-              disabled={isLeaving}
+              disabled={isLeaving || isLastAdmin}
               onClick={() => void handleConfirmLeave()}
               className="h-8 px-3 text-xs font-semibold cursor-pointer shadow-2xs rounded-[var(--radius-sketch-sm)]"
             >
@@ -895,33 +916,50 @@ export function DialogCreateRoom({
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
   const [isPrivate, setIsPrivate] = useState(false)
-  const [selectedTopics, setSelectedTopics] = useState<string[]>([defaultTopic ?? "general"])
-  const [topicSearch, setTopicSearch] = useState("")
+  const [selectedTopics, setSelectedTopics] = useState<string[]>(
+    defaultTopic ? [defaultTopic.toLowerCase()] : []
+  )
+  const [topicInput, setTopicInput] = useState("")
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [step, setStep] = useState<1 | 2>(1)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const visibleTopics = useMemo(() => {
-    if (!topicSearch.trim()) return PREDEFINED_TOPICS
-    const q = topicSearch.trim().toLowerCase()
-    return PREDEFINED_TOPICS.filter((t) => t.toLowerCase().includes(q))
-  }, [topicSearch])
-
   useEffect(() => {
-    if (defaultTopic && !selectedTopics.includes(defaultTopic)) {
-      setSelectedTopics((prev) => [...prev, defaultTopic])
+    if (defaultTopic && !selectedTopics.includes(defaultTopic.toLowerCase())) {
+      setSelectedTopics((prev) => [...prev, defaultTopic.toLowerCase()])
     }
   }, [defaultTopic])
 
   const resetForm = () => {
+    setStep(1)
     setName("")
     setDescription("")
     setIsPrivate(false)
-    setSelectedTopics([defaultTopic ?? "general"])
-    setTopicSearch("")
+    setSelectedTopics(defaultTopic ? [defaultTopic.toLowerCase()] : [])
+    setTopicInput("")
     setAvatarUrl(null)
     setError(null)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ""
+    }
+  }
+
+  const handleAddTopic = (topicToAdd?: string) => {
+    const raw = (topicToAdd ?? topicInput).trim().replace(/^#+/, "").toLowerCase()
+    if (!raw) return
+    if (!selectedTopics.includes(raw)) {
+      setSelectedTopics((prev) => [...prev, raw])
+    }
+    if (!topicToAdd) {
+      setTopicInput("")
+    }
+    if (error) setError(null)
+  }
+
+  const handleRemoveTopic = (topicToRemove: string) => {
+    setSelectedTopics((prev) => prev.filter((t) => t !== topicToRemove))
   }
 
   function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
@@ -940,20 +978,16 @@ export function DialogCreateRoom({
     reader.readAsDataURL(file)
   }
 
-  const toggleTopic = (topic: string) => {
-    setSelectedTopics((prev) => {
-      if (prev.includes(topic)) {
-        // Keep at least one or allow empty
-        return prev.filter((t) => t !== topic)
-      }
-      return [...prev, topic]
-    })
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
+  async function handleSubmit(e?: React.FormEvent) {
+    if (e) e.preventDefault()
     if (!name.trim()) {
       setError("Channel name is required")
+      setStep(1)
+      return
+    }
+    if (selectedTopics.length === 0) {
+      setError("At least one topic is required")
+      setStep(2)
       return
     }
 
@@ -965,7 +999,7 @@ export function DialogCreateRoom({
         name: name.trim(),
         description: description.trim() || undefined,
         isPrivate,
-        topics: selectedTopics.length > 0 ? selectedTopics : ["general"],
+        topics: selectedTopics,
         avatarUrl,
         creatorId,
       }
@@ -1007,169 +1041,276 @@ export function DialogCreateRoom({
         <DialogTrigger asChild>{trigger}</DialogTrigger>
       ) : null}
 
-      <DialogContent className="sm:max-w-md rounded-[var(--radius-sketch-md)]" aria-describedby={undefined}>
-        <DialogHeader>
-          <DialogTitle className="font-display text-xl font-semibold">Create New Channel</DialogTitle>
+      <DialogContent className="sm:max-w-md max-h-[85vh] flex flex-col gap-0 p-0 overflow-hidden rounded-[var(--radius-sketch-md)]">
+        <DialogHeader className="px-6 pt-5 pb-3 border-b border-line shrink-0 pr-12">
+          <DialogTitle className="font-display text-xl font-semibold">
+            Create New Channel
+          </DialogTitle>
+          <DialogDescription className="sr-only">
+            Create a new channel
+          </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4 pt-1">
-          {/* Avatar Upload */}
-          <div className="flex flex-col items-center justify-center gap-2 pb-1">
-            <Avatar className="h-16 w-16 border-2 border-line shadow-sm">
-              <AvatarImage src={avatarUrl ?? undefined} />
-              <AvatarFallback className="bg-paper-dark text-lg font-bold text-ink-muted">
-                <IconPhoto size={28} />
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex items-center gap-2">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleFileChange}
-              />
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-7 text-xs rounded-[var(--radius-sketch-sm)] cursor-pointer"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                Upload Channel Icon
-              </Button>
-              {avatarUrl && (
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-6 py-4 space-y-4 scrollbar-thin">
+          {step === 1 ? (
+            <>
+              {/* Avatar Upload */}
+              <div className="flex flex-col items-center justify-center gap-1.5 pb-1">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleFileChange}
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="group relative cursor-pointer rounded-full outline-none focus:ring-2 focus:ring-[var(--pencil-blue)] transition-all"
+                  title="Click to choose channel image"
+                >
+                  <Avatar className="h-16 w-16 border-2 border-line group-hover:border-[var(--pencil-blue)] shadow-sm transition-colors">
+                    <AvatarImage src={avatarUrl ?? undefined} />
+                    <AvatarFallback className="bg-paper-dark text-lg font-bold text-ink-muted group-hover:text-ink transition-colors">
+                      <IconPhoto size={28} />
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/35 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <IconPhoto size={22} className="text-white drop-shadow" />
+                  </div>
+                </button>
+                {avatarUrl && (
+                  <button
+                    type="button"
+                    className="text-[11px] text-[var(--pencil-coral)] hover:underline cursor-pointer transition-colors"
+                    onClick={() => {
+                      setAvatarUrl(null)
+                      if (fileInputRef.current) {
+                        fileInputRef.current.value = ""
+                      }
+                    }}
+                  >
+                    Remove image
+                  </button>
+                )}
+              </div>
+
+              {/* Channel Name */}
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-ink font-display">
+                  Channel Name <span className="text-[var(--pencil-coral)]">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={name}
+                  onChange={(e) => {
+                    setName(e.target.value)
+                    if (error) setError(null)
+                  }}
+                  placeholder="e.g. architects-lounge"
+                  className="h-9 w-full rounded-[var(--radius-sketch-sm)] border border-line bg-paper px-3 text-xs text-ink placeholder:text-ink-subtle outline-none focus:border-[var(--pencil-blue)] focus:ring-2 focus:ring-[var(--pencil-blue-soft)] transition-all"
+                />
+              </div>
+
+              {/* Description */}
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-ink font-display">
+                  Description <span className="text-[11px] text-ink-muted font-normal">(optional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="What is this channel about?"
+                  className="h-9 w-full rounded-[var(--radius-sketch-sm)] border border-line bg-paper px-3 text-xs text-ink placeholder:text-ink-subtle outline-none focus:border-[var(--pencil-blue)] focus:ring-2 focus:ring-[var(--pencil-blue-soft)] transition-all"
+                />
+              </div>
+
+              {/* Visibility */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-ink font-display">
+                  Channel Visibility
+                </label>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 text-xs font-medium text-ink cursor-pointer">
+                    <input
+                      type="radio"
+                      name="create-visibility"
+                      checked={!isPrivate}
+                      onChange={() => setIsPrivate(false)}
+                      className="accent-[var(--pencil-blue)] cursor-pointer"
+                    />
+                    Public
+                  </label>
+                  <label className="flex items-center gap-2 text-xs font-medium text-ink cursor-pointer">
+                    <input
+                      type="radio"
+                      name="create-visibility"
+                      checked={isPrivate}
+                      onChange={() => setIsPrivate(true)}
+                      className="accent-[var(--pencil-blue)] cursor-pointer"
+                    />
+                    Private
+                  </label>
+                </div>
+              </div>
+
+              {error && (
+                <p className="text-xs text-[var(--pencil-coral)] font-medium">
+                  {error}
+                </p>
+              )}
+
+              {/* Next Button */}
+              <div className="pt-2">
                 <Button
                   type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 px-2 text-xs text-[var(--pencil-coral)] hover:bg-[var(--pencil-coral-soft)] cursor-pointer"
-                  onClick={() => setAvatarUrl(null)}
+                  onClick={() => {
+                    if (!name.trim()) {
+                      setError("Channel name is required")
+                      return
+                    }
+                    setError(null)
+                    setStep(2)
+                  }}
+                  disabled={!name.trim()}
+                  className="w-full h-9 rounded-[var(--radius-sketch-sm)] bg-[var(--pencil-blue)] hover:bg-[var(--pencil-blue)]/90 text-white font-semibold text-xs shadow-2xs cursor-pointer disabled:opacity-50"
                 >
-                  <IconTrash size={14} className="mr-1" /> Remove
+                  Next
                 </Button>
-              )}
-            </div>
-          </div>
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Step 2: Topics Selection */}
+              <div className="space-y-3">
+                {/* Selected Topics List */}
+                {selectedTopics.length > 0 && (
+                  <div className="space-y-1">
+                    <span className="text-[10px] uppercase tracking-wider font-semibold text-ink-subtle block">
+                      Selected topics ({selectedTopics.length})
+                    </span>
+                    <div className="flex flex-wrap gap-1 p-2 rounded-[var(--radius-sketch-sm)] border border-line/60 bg-paper max-h-24 overflow-y-auto scrollbar-ultra-thin">
+                      {selectedTopics.map((topic) => (
+                        <span
+                          key={topic}
+                          className="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-[var(--radius-sketch-sm)] text-[11px] font-semibold bg-[var(--pencil-blue)] text-white shadow-2xs"
+                        >
+                          <span>{topic}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveTopic(topic)}
+                            className="rounded-full p-0.5 hover:bg-black/20 text-white/90 hover:text-white cursor-pointer transition-colors"
+                            title={`Remove ${topic}`}
+                          >
+                            <IconX size={12} stroke={2.5} />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
-          {/* Channel Name */}
-          <div className="space-y-1">
-            <label className="text-xs font-semibold text-ink font-display">
-              Channel Name <span className="text-[var(--pencil-coral)]">*</span>
-            </label>
-            <input
-              type="text"
-              required
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. architects-lounge"
-              className="h-9 w-full rounded-[var(--radius-sketch-sm)] border border-line bg-paper px-3 text-xs text-ink placeholder:text-ink-subtle outline-none focus:border-[var(--pencil-blue)] focus:ring-2 focus:ring-[var(--pencil-blue-soft)] transition-all"
-            />
-          </div>
+                {/* Min 1 required message beside Add topic label in brackets */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-1 text-[11px]">
+                    <span className="text-ink-subtle font-medium">Add topic</span>
+                    <span
+                      className={
+                        selectedTopics.length === 0
+                          ? "text-[var(--pencil-coral)] font-medium"
+                          : "text-ink-subtle"
+                      }
+                    >
+                      (min 1 required)
+                    </span>
+                  </div>
 
-          {/* Description */}
-          <div className="space-y-1">
-            <label className="text-xs font-semibold text-ink font-display">
-              Description <span className="text-[11px] text-ink-muted font-normal">(optional)</span>
-            </label>
-            <input
-              type="text"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="What is this channel about?"
-              className="h-9 w-full rounded-[var(--radius-sketch-sm)] border border-line bg-paper px-3 text-xs text-ink placeholder:text-ink-subtle outline-none focus:border-[var(--pencil-blue)] focus:ring-2 focus:ring-[var(--pencil-blue-soft)] transition-all"
-            />
-          </div>
-
-          {/* Visibility */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-ink font-display">
-              Channel Visibility
-            </label>
-            <div className="flex gap-4">
-              <label className="flex items-center gap-2 text-xs font-medium text-ink cursor-pointer">
-                <input
-                  type="radio"
-                  name="visibility"
-                  checked={!isPrivate}
-                  onChange={() => setIsPrivate(false)}
-                  className="accent-[var(--pencil-teal)] cursor-pointer"
-                />
-                Public
-              </label>
-              <label className="flex items-center gap-2 text-xs font-medium text-ink cursor-pointer">
-                <input
-                  type="radio"
-                  name="visibility"
-                  checked={isPrivate}
-                  onChange={() => setIsPrivate(true)}
-                  className="accent-[var(--pencil-teal)] cursor-pointer"
-                />
-                Private
-              </label>
-            </div>
-          </div>
-
-          {/* Predefined Topics Selection (Multiple) */}
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-semibold text-ink font-display">
-                Topics <span className="text-[11px] text-ink-muted font-normal">(choose one or more)</span>
-              </label>
-              <span className="text-[11px] text-ink-muted">
-                {selectedTopics.length} selected
-              </span>
-            </div>
-            {/* Quick search/filter input for topics */}
-            <input
-              type="text"
-              value={topicSearch}
-              onChange={(e) => setTopicSearch(e.target.value)}
-              placeholder="Search topics (e.g. ai, gaming, sports)..."
-              className="h-7 w-full rounded-[var(--radius-sketch-sm)] border border-line bg-paper px-2.5 text-[11px] text-ink placeholder:text-ink-subtle outline-none focus:border-[var(--pencil-blue)] focus:ring-1 focus:ring-[var(--pencil-blue-soft)] transition-all"
-            />
-            <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto p-1.5 rounded-[var(--radius-sketch-sm)] border border-line bg-paper-subtle scrollbar-ultra-thin">
-              {visibleTopics.map((topic) => {
-                const isSelected = selectedTopics.includes(topic)
-                return (
-                  <button
-                    key={topic}
-                    type="button"
-                    onClick={() => toggleTopic(topic)}
-                    className={`px-2 py-0.5 text-[11px] font-medium rounded-[var(--radius-sketch-sm)] border transition-all duration-150 cursor-pointer select-none ${
-                      isSelected
-                        ? "bg-[var(--pencil-blue)] text-white border-[var(--pencil-blue)] shadow-2xs font-semibold"
-                        : "bg-paper text-ink-muted border-line hover:border-[var(--pencil-blue)]/50 hover:text-ink"
-                    }`}
-                  >
-                    {isSelected ? `✓ ${topic}` : `+ ${topic}`}
-                  </button>
-                )
-              })}
-              {visibleTopics.length === 0 && (
-                <div className="w-full py-2 text-center text-[11px] text-ink-subtle">
-                  No matching topics found
+                  {/* Add Custom Topic Input + Button */}
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="text"
+                      value={topicInput}
+                      onChange={(e) => setTopicInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault()
+                          handleAddTopic()
+                        }
+                      }}
+                      placeholder="Add a topic (e.g. dev, design)..."
+                      className="h-8 flex-1 px-3 rounded-[var(--radius-sketch-sm)] border border-line bg-paper text-xs text-ink placeholder:text-ink-subtle outline-none focus:border-[var(--pencil-blue)] focus:ring-1 focus:ring-[var(--pencil-blue-soft)] transition-all"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleAddTopic()}
+                      disabled={!topicInput.trim()}
+                      className="h-8 px-3 text-xs font-medium border-line text-ink hover:border-[var(--pencil-blue)] hover:text-[var(--pencil-blue)] rounded-[var(--radius-sketch-sm)] cursor-pointer disabled:opacity-40 shrink-0"
+                    >
+                      Add
+                    </Button>
+                  </div>
                 </div>
+
+                {/* Topics List (no Suggested topics message, no + and no # signs) */}
+                <div className="flex flex-wrap gap-1 max-h-32 overflow-y-auto p-2 rounded-[var(--radius-sketch-sm)] border border-line/50 bg-paper/60 scrollbar-ultra-thin">
+                  {PREDEFINED_TOPICS.map((topic) => {
+                    const normalized = topic.toLowerCase()
+                    const isAdded = selectedTopics.includes(normalized)
+                    return (
+                      <button
+                        key={topic}
+                        type="button"
+                        onClick={() => {
+                          if (isAdded) {
+                            handleRemoveTopic(normalized)
+                          } else {
+                            handleAddTopic(normalized)
+                          }
+                        }}
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-[var(--radius-sketch-sm)] text-[10px] font-medium transition-all cursor-pointer ${
+                          isAdded
+                            ? "bg-[var(--pencil-blue)] text-white shadow-2xs font-semibold"
+                            : "bg-paper border border-line text-ink-muted hover:text-ink hover:border-line-strong"
+                        }`}
+                      >
+                        <span>{topic}</span>
+                        {isAdded && <span className="text-[9px]">✓</span>}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {error && (
+                <p className="text-xs text-[var(--pencil-coral)] font-medium">
+                  {error}
+                </p>
               )}
-            </div>
-          </div>
 
-          {error && (
-            <p className="text-xs text-[var(--pencil-coral)] font-medium">
-              {error}
-            </p>
+              {/* Submit Buttons */}
+              <div className="pt-2 flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setStep(1)}
+                  className="flex-1 h-9 rounded-[var(--radius-sketch-sm)] border-line text-xs font-semibold cursor-pointer"
+                >
+                  Back
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={isSubmitting || selectedTopics.length === 0 || !name.trim()}
+                  className="flex-1 h-9 rounded-[var(--radius-sketch-sm)] bg-[var(--pencil-blue)] hover:bg-[var(--pencil-blue)]/90 text-white font-semibold text-xs shadow-2xs cursor-pointer disabled:opacity-50"
+                >
+                  {isSubmitting ? "Creating..." : "Create"}
+                </Button>
+              </div>
+            </>
           )}
-
-          {/* Submit Button */}
-          <div className="pt-2">
-            <Button
-              type="submit"
-              disabled={isSubmitting || !name.trim()}
-              className="w-full h-9 rounded-[var(--radius-sketch-sm)] bg-[var(--pencil-blue)] hover:bg-[var(--pencil-blue)]/90 text-white font-semibold text-xs shadow-2xs cursor-pointer disabled:opacity-50"
-            >
-              {isSubmitting ? "Creating channel..." : "Create channel"}
-            </Button>
-          </div>
         </form>
       </DialogContent>
     </Dialog>
