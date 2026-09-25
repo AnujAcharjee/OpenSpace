@@ -92,11 +92,18 @@ export function DialogSettings() {
         finalAvatarUrl = await uploadToCloudinary(optimizedBlob)
       }
 
-      const payload = {
+      const cleanUsername = data.username ? String(data.username).trim().replace(/^@+/, "") : ""
+      const currentCleanUsername = user?.username ? String(user.username).trim().replace(/^@+/, "") : ""
+
+      const payload: Record<string, any> = {
         name: data.name?.trim() || null,
-        username: data.username.trim(),
         bio: data.bio?.trim() || null,
         avatarUrl: finalAvatarUrl,
+      }
+
+      // Only send username if it actually changed to avoid redundant uniqueness conflicts
+      if (cleanUsername && cleanUsername.toLowerCase() !== currentCleanUsername.toLowerCase()) {
+        payload.username = cleanUsername
       }
 
       const res = await axios.patch(`${usersApiUrl}/${userId}`, payload, {
@@ -111,7 +118,6 @@ export function DialogSettings() {
       setPreviewUrl(null)
       setRemovePhoto(false)
     } catch (error: any) {
-      console.error(error)
       const message = axios.isAxiosError(error)
         ? (error.response?.data?.error ?? error.response?.data?.message ?? "Failed to update profile")
         : (error.message || "Failed to update profile")

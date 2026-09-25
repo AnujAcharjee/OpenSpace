@@ -15,12 +15,45 @@ export const editUser = async (req: Request, res: Response) => {
     });
   }
 
+  const cleanUsername =
+    data.username !== undefined ? data.username.trim().replace(/^@+/, '') : undefined;
+
+  if (cleanUsername !== undefined) {
+    const existingUser = await prisma.user.findFirst({
+      where: {
+        id: { not: id },
+        username: {
+          equals: cleanUsername,
+          mode: 'insensitive',
+        },
+      },
+    });
+
+    if (existingUser) {
+      throw new AppError(`Username @${cleanUsername} is already taken`, 409);
+    }
+  }
+
+  if (data.email !== undefined) {
+    const cleanEmail = data.email.trim().toLowerCase();
+    const existingEmail = await prisma.user.findFirst({
+      where: {
+        id: { not: id },
+        email: cleanEmail,
+      },
+    });
+
+    if (existingEmail) {
+      throw new AppError('This email is already in use by another account', 409);
+    }
+  }
+
   try {
     const updatedUser = await prisma.user.update({
       where: { id },
       data: {
-        ...(data.email !== undefined && { email: data.email.toLowerCase() }),
-        ...(data.username !== undefined && { username: data.username }),
+        ...(data.email !== undefined && { email: data.email.trim().toLowerCase() }),
+        ...(cleanUsername !== undefined && { username: cleanUsername }),
         ...(data.name !== undefined && { name: data.name }),
         ...(data.bio !== undefined && { bio: data.bio }),
         ...(data.avatarUrl !== undefined && { avatarUrl: data.avatarUrl }),
