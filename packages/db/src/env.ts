@@ -1,40 +1,6 @@
-import dotenv from 'dotenv';
-import fs from 'fs';
-import path from 'path';
+import { initEnv } from '@repo/env';
 
-// 1. Load base .env from current and parent directories
-let currentDir = process.cwd();
-for (let i = 0; i < 4; i++) {
-  const baseEnvPath = path.resolve(currentDir, '.env');
-  if (fs.existsSync(baseEnvPath)) {
-    dotenv.config({ path: baseEnvPath });
-  }
-  const parentDir = path.dirname(currentDir);
-  if (parentDir === currentDir) break;
-  currentDir = parentDir;
-}
-
-// 2. Override with local development files in standard precedence order when not in production
-if (process.env.NODE_ENV !== 'production') {
-  const overrideFiles = [
-    '.env.development',
-    '.env.local',
-    '.env.development.local',
-  ];
-
-  currentDir = process.cwd();
-  for (let i = 0; i < 4; i++) {
-    for (const file of overrideFiles) {
-      const candidatePath = path.resolve(currentDir, file);
-      if (fs.existsSync(candidatePath)) {
-        dotenv.config({ path: candidatePath, override: true });
-      }
-    }
-    const parentDir = path.dirname(currentDir);
-    if (parentDir === currentDir) break;
-    currentDir = parentDir;
-  }
-}
+initEnv();
 
 export interface DbEnv {
   DATABASE_URL: string;

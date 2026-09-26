@@ -16,6 +16,7 @@ on:
       - '.prettier*'
       - '.vscode/**'
       - '**/.env.example'
+      - '**/.env.development.example'
       - '**/.env.development.local'
 
 concurrency:

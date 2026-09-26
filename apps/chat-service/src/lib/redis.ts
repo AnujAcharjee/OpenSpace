@@ -1,8 +1,6 @@
-import dotenv from 'dotenv';
-import path from 'path';
+import { initEnv } from '@repo/env';
 
-dotenv.config();
-dotenv.config({ path: path.resolve(process.cwd(), '../../.env') });
+initEnv();
 
 import { createRedisClient, type RedisClient, type RedisEventHandlers } from '@repo/redis';
 import { logger } from './logger.js';

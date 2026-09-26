@@ -5,7 +5,9 @@
   "license": "MIT",
   "scripts": {
     "build": "turbo run build",
-    "dev": "turbo run dev",
+    "dev": "cross-env ENV_TARGET=local turbo run dev",
+    "dev:local": "cross-env ENV_TARGET=local turbo run dev",
+    "dev:cloud": "cross-env ENV_TARGET=cloud turbo run dev",
     "lint": "turbo run lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "check-types": "turbo run check-types",
@@ -17,6 +19,7 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "cross-env": "^10.1.0",
     "eslint-config-prettier": "^10.1.1",
     "prettier": "^3.7.4",
     "turbo": "^2.8.17",

@@ -15,6 +15,7 @@
     "@anuj304/pramaan": "^1.0.0",
     "@repo/auth": "workspace:*",
     "@repo/db": "workspace:*",
+    "@repo/env": "workspace:*",
     "@repo/logger": "workspace:*",
     "@repo/redis": "workspace:*",
     "@repo/validation": "workspace:*",
