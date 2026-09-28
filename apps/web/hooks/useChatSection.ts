@@ -289,13 +289,12 @@ function useSendMessage(
 
 function useDeleteMessage(
   roomId: string,
-  userId: string,
+  _userId: string,
   replyingTo: RoomMessage | null,
   onClearReply: () => void
 ) {
   const removeMessage = useAppStore((s) => s.removeMessage)
-  const setMessages = useAppStore((s) => s.setMessages)
-  const { deleteMessage, fetchMessages } = useMessage()
+  const { deleteMessage } = useMessage()
   const [deletingMessageId, setDeletingMessageId] = useState<string | null>(
     null
   )
@@ -304,26 +303,28 @@ function useDeleteMessage(
     if (deletingMessageId) return
     setDeletingMessageId(messageId)
 
-    // 1. Instantly remove from local store for immediate 0ms UI feedback
-    removeMessage(roomId, messageId)
-    if (replyingTo?.id === messageId) onClearReply()
-
     try {
-      await deleteMessage(messageId)
-      toast.success("Message deleted", toastOptions)
+      const result = await deleteMessage(messageId)
+      const confirmedId = (typeof result === "string" ? result : result?.id) ?? messageId
+      // Only delete from store / IndexedDB once delete confirmation is received
+      if (confirmedId) {
+        removeMessage(roomId, confirmedId)
+        if (replyingTo?.id === confirmedId) onClearReply()
+        toast.success("Message deleted", toastOptions)
+      }
     } catch (error) {
-      // Re-fetch to restore state if deletion failed on server
-      try {
-        const refreshed = (await fetchMessages(roomId, userId)).map(toRoomMessage)
-        setMessages(roomId, refreshed)
-      } catch {}
-
-      const message = axios.isAxiosError(error)
+      // Do NOT delete from local store. Show explicit error toast.
+      const serverMessage = axios.isAxiosError(error)
         ? (error.response?.data?.error ??
           error.response?.data?.message ??
           "Unable to delete message")
         : "Unable to delete message"
-      toast.error(message, toastOptions)
+
+      const errorMessage = serverMessage.toLowerCase().startsWith("error")
+        ? serverMessage
+        : `Error: ${serverMessage}`
+
+      toast.error(errorMessage, toastOptions)
     } finally {
       setDeletingMessageId(null)
     }

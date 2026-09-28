@@ -2,11 +2,12 @@
 
 import { useMemo, useState, useEffect, Suspense } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
+import axios from "axios"
 import useAppStore from "@/stores/app-store"
 import { IconShieldCheck, IconLoader2 } from "@tabler/icons-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { pramaanAuthApiUrl } from "@/constants/apiUrls"
+import { pramaanAuthApiUrl, usersApiUrl } from "@/constants/apiUrls"
 import { AppIcon } from "@/components/AppIcon"
 
 function buildPramaanUrl(returnUrl?: string | null) {
@@ -29,7 +30,8 @@ function SignInContent() {
   const error = searchParams.get("error")
   const returnUrl = searchParams.get("returnUrl")
 
-  const user = useAppStore((s) => s.user)
+  const resetAppState = useAppStore((s) => s.resetAppState)
+  const hydrateUserState = useAppStore((s) => s.hydrateUserState)
   const hasHydrated = useAppStore((s) => s.hasHydrated)
 
   const [loading, setLoading] = useState(false)
@@ -37,13 +39,46 @@ function SignInContent() {
   const signinUrl = useMemo(() => buildPramaanUrl(returnUrl), [returnUrl])
 
   useEffect(() => {
-    if (hasHydrated && user?.username) {
-      const destination = returnUrl
-        ? decodeURIComponent(returnUrl)
-        : `/@${encodeURIComponent(user.username)}`
-      router.replace(destination)
+    if (!hasHydrated) return
+
+    let isMounted = true
+
+    // Verify session with the backend (inspects the accessToken cookie)
+    // rather than blindly trusting local client storage
+    const verifySession = async () => {
+      try {
+        const res = await axios.get(`${usersApiUrl}/hydrate`, {
+          withCredentials: true,
+        })
+        if (!isMounted) return
+
+        if (res.data?.data?.user) {
+          const verifiedUser = res.data.data.user
+          hydrateUserState({
+            user: verifiedUser,
+            rooms: res.data.data.rooms ?? [],
+          })
+          const destination = returnUrl
+            ? decodeURIComponent(returnUrl)
+            : `/@${encodeURIComponent(verifiedUser.username)}`
+          router.replace(destination)
+        } else {
+          resetAppState()
+        }
+      } catch {
+        if (isMounted) {
+          // Token is missing, expired, or invalid. Wipe stale cached user from storage
+          resetAppState()
+        }
+      }
     }
-  }, [hasHydrated, user, returnUrl, router])
+
+    void verifySession()
+
+    return () => {
+      isMounted = false
+    }
+  }, [hasHydrated, returnUrl, router, hydrateUserState, resetAppState])
 
   function handleNavigate(url: string) {
     setLoading(true)

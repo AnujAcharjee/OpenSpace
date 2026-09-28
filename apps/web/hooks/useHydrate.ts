@@ -38,6 +38,17 @@ export const useHydrate = (userid?: string) => {
       })
     } catch (error) {
       resetAppState()
+      if (typeof window !== "undefined" && !window.location.pathname.startsWith("/signin")) {
+        const isUserPage =
+          window.location.pathname.startsWith("/@") ||
+          window.location.pathname.startsWith("/user") ||
+          window.location.pathname.startsWith("/profile") ||
+          window.location.pathname.startsWith("/settings")
+        if (isUserPage) {
+          const returnUrl = encodeURIComponent(`${window.location.pathname}${window.location.search}`)
+          window.location.href = `/signin?returnUrl=${returnUrl}`
+        }
+      }
       console.warn("User is not authenticated or hydrate failed:", error)
     }
   }, [hydrateUserState, resetAppState])

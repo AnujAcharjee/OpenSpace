@@ -33,8 +33,19 @@ export const useHydrate = () => {
       }
     } catch (error) {
       if (axios.isAxiosError(error) && error.response?.status === 401) {
-        // Only clear sensitive session state if user is explicitly unauthenticated
+        // Clear sensitive session state when explicitly unauthenticated
         resetAppState()
+        if (typeof window !== "undefined" && !window.location.pathname.startsWith("/signin")) {
+          const isUserPage =
+            window.location.pathname.startsWith("/@") ||
+            window.location.pathname.startsWith("/user") ||
+            window.location.pathname.startsWith("/profile") ||
+            window.location.pathname.startsWith("/settings")
+          if (isUserPage) {
+            const returnUrl = encodeURIComponent(`${window.location.pathname}${window.location.search}`)
+            window.location.href = `/signin?returnUrl=${returnUrl}`
+          }
+        }
       } else {
         // For network drops or server reboots, preserve offline cache!
         console.warn("Hydrate request was not reachable; preserving local offline cache:", error)
