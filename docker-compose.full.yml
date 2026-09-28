@@ -84,9 +84,10 @@ services:
       - COOKIE_DOMAIN=${COOKIE_DOMAIN:-}
       - COOKIE_SAME_SITE=${COOKIE_SAME_SITE:-lax}
       - PRAMAAN_CLIENT_ID=${PRAMAAN_CLIENT_ID}
-      - PRAMAAN_SECRET=${PRAMAAN_SECRET}
-      - CALLBACK_URL=${CALLBACK_URL}
+      - PRAMAAN_CLIENT_SECRET=${PRAMAAN_CLIENT_SECRET}
+      - CALLBACK_URL=${CALLBACK_URL:-}
       - PRAMAAN_SERVER_URL=${PRAMAAN_SERVER_URL}
+      - API_GATEWAY_URL=${API_GATEWAY_URL:-http://api-gateway:3005}
     networks:
       - openspace_net
 
@@ -128,6 +129,7 @@ services:
       - DATABASE_URL=${DATABASE_URL}
       - REDIS_URL=${REDIS_URL}
       - GATEWAY_INTERNAL_SECRET=${GATEWAY_INTERNAL_SECRET}
+      - INSTANCE_NAME=${INSTANCE_NAME:-ws-node-1}
     networks:
       - openspace_net
 
