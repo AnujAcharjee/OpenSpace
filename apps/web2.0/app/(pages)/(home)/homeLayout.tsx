@@ -13,9 +13,11 @@ import {
   ResizablePanelGroup,
 } from "@/components/ui/resizable"
 import { ChatOnboarding } from "@/components/ChatOnboarding"
+import { AppIcon } from "@/components/AppIcon"
+import { IconLoader2 } from "@tabler/icons-react"
 
 export default function HomeLayout() {
-  const { hasHydrated, fetch, user, isCurrentUser, activeRoom } = useHomePage()
+  const { hasHydrated, isLoading, fetch, user, isCurrentUser, activeRoom } = useHomePage()
   const isLg = useIsLargeScreen()
   const isExploringChannels = useAppStore((s) => s.isExploringChannels)
 
@@ -27,10 +29,19 @@ export default function HomeLayout() {
     void fetch()
   }, [fetch, hasHydrated])
 
-  if (!hasHydrated) {
+  if (!hasHydrated || isLoading || !user) {
     return (
-      <div className="flex h-svh w-full items-center justify-center bg-paper text-sm text-ink-muted font-display">
-        Opening OpenSpace...
+      <div className="relative flex h-svh w-full flex-col items-center justify-center overflow-hidden bg-paper text-ink">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(212,160,61,0.08)_0%,transparent_65%)]" />
+        <div className="relative flex flex-col items-center gap-4">
+          <div className="animate-pulse">
+            <AppIcon size="lg" />
+          </div>
+          <div className="flex items-center gap-2.5 font-display text-sm font-semibold tracking-tight text-ink-muted">
+            <IconLoader2 className="size-4 animate-spin text-[var(--pencil-teal)]" />
+            <span>Opening OpenSpace...</span>
+          </div>
+        </div>
       </div>
     )
   }

@@ -2,7 +2,7 @@
 
 import useAppStore from "@/stores/app-store"
 import axios from "axios"
-import { useCallback } from "react"
+import { useCallback, useState } from "react"
 import type { RoomRecord, UserRecord } from "@repo/validation"
 import { useShallow } from "zustand/react/shallow"
 import { usersApiUrl } from "@/constants/apiUrls"
@@ -19,8 +19,11 @@ export const useHydrate = () => {
       }))
     )
 
+  const [isLoading, setIsLoading] = useState(!user)
+
   const fetch = useCallback(async () => {
     try {
+      setIsLoading(true)
       const res = await axios.get(`${usersApiUrl}/hydrate`, {
         withCredentials: true,
       })
@@ -30,6 +33,8 @@ export const useHydrate = () => {
           user: res.data.data.user as UserRecord,
           rooms: (res.data.data.rooms as RoomRecord[]) ?? [],
         })
+      } else {
+        resetAppState()
       }
     } catch (error) {
       if (axios.isAxiosError(error) && error.response?.status === 401) {
@@ -50,8 +55,10 @@ export const useHydrate = () => {
         // For network drops or server reboots, preserve offline cache!
         console.warn("Hydrate request was not reachable; preserving local offline cache:", error)
       }
+    } finally {
+      setIsLoading(false)
     }
   }, [hydrateUserState, resetAppState])
 
-  return { hasHydrated, fetch, user, rooms }
+  return { hasHydrated, isLoading, fetch, user, rooms }
 }

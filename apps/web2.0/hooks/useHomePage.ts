@@ -9,7 +9,7 @@ export function useHomePage() {
   const rawParam = params?.username ?? params?.userid ?? ""
   const cleanUsername = rawParam ? decodeURIComponent(rawParam).replace(/^@+/, "") : ""
 
-  const { hasHydrated, fetch, user, rooms } = useHydrate()
+  const { hasHydrated, isLoading, fetch, user, rooms } = useHydrate()
 
   const activeRoomId = useAppStore((s) => s.activeRoom)
   const isCurrentUser = Boolean(
@@ -29,6 +29,7 @@ export function useHomePage() {
     userid: user?.id,
     username: cleanUsername,
     hasHydrated,
+    isLoading,
     fetch,
     user,
     isCurrentUser,
