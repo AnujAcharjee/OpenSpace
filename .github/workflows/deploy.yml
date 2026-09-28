@@ -15,9 +15,8 @@ on:
       - '.gitignore'
       - '.prettier*'
       - '.vscode/**'
-      - '**/.env.example'
-      - '**/.env.development.example'
-      - '**/.env.development.local'
+      - '**/.env*.example'
+      - '**/.env.development'
 
 concurrency:
   group: deploy-${{ github.ref }}

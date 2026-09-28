@@ -34,8 +34,6 @@ services:
     image: anuj304/openspace:api-gateway
     container_name: openspace_api_gateway
     restart: unless-stopped
-    ports:
-      - "3005:3005"
     environment:
       - NODE_ENV=production
       - PORT=3005
@@ -64,8 +62,6 @@ services:
     image: anuj304/openspace:http-service
     container_name: openspace_http_service
     restart: unless-stopped
-    ports:
-      - "3001:3001"
     environment:
       - NODE_ENV=production
       - PORT=3001
@@ -81,6 +77,7 @@ services:
       - PRAMAAN_CLIENT_SECRET=${PRAMAAN_CLIENT_SECRET}
       - CALLBACK_URL=${CALLBACK_URL}
       - PRAMAAN_SERVER_URL=${PRAMAAN_SERVER_URL}
+      - API_GATEWAY_URL=${API_GATEWAY_URL:-http://api-gateway:3005}
     networks:
       - openspace_net
 
