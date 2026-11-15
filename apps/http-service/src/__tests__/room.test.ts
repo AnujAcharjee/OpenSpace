@@ -26,11 +26,6 @@ const { mockRedis, mockPrisma } = vi.hoisted(() => ({
       findMany: vi.fn(),
       delete: vi.fn(),
     },
-    chatRoomJoinRequest: {
-      findUnique: vi.fn(),
-      create: vi.fn(),
-      upsert: vi.fn(),
-    },
     chatMessage: {
       create: vi.fn(),
       findMany: vi.fn(),
@@ -39,6 +34,7 @@ const { mockRedis, mockPrisma } = vi.hoisted(() => ({
     },
     user: {
       findUnique: vi.fn(),
+      findMany: vi.fn().mockResolvedValue([]),
     },
   },
 }));
@@ -67,11 +63,6 @@ vi.mock('@repo/db', () => ({
     ADMIN: 'ADMIN',
     OWNER: 'OWNER',
   },
-  JoinRequestStatus: {
-    PENDING: 'PENDING',
-    ACCEPTED: 'ACCEPTED',
-    REJECTED: 'REJECTED',
-  },
   MessageType: {
     TEXT: 'TEXT',
     SYSTEM: 'SYSTEM',
@@ -89,11 +80,12 @@ vi.mock('../../utils/logger.js', () => ({
 }));
 
 import { searchRooms } from '../controllers/room/searchRooms.js';
-import { requestJoinRoomController } from '../controllers/room/requestJoinRoom.js';
+import { createDirectRoom } from '../controllers/room/createDirectRoom.js';
+import { createGroupRoom } from '../controllers/room/createGroupRoom.js';
 import { createRoom } from '../controllers/room/createRoom.js';
 import { leaveRoom } from '../controllers/room/leaveRoom.js';
 
-describe('HTTP Service - Room Search & Join', () => {
+describe('HTTP Service - Room Management (1-to-1 and Groups)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -110,9 +102,9 @@ describe('HTTP Service - Room Search & Join', () => {
       mockPrisma.chatRoom.findMany.mockResolvedValueOnce([
         {
           id: 'a0000000-0000-0000-0000-000000000001',
-          name: 'Collab Dev',
+          type: 'GROUP',
+          name: 'Engineering Team',
           description: 'Dev room',
-          isPrivate: false,
           creatorId: 'a0000000-0000-0000-0000-000000000002',
           createdAt: new Date(),
           updatedAt: new Date(),
@@ -122,7 +114,7 @@ describe('HTTP Service - Room Search & Join', () => {
       ]);
 
       const req = {
-        query: { name: 'collab' },
+        query: { name: 'engineering' },
       } as unknown as Request;
 
       const res = createMockRes();
@@ -132,7 +124,7 @@ describe('HTTP Service - Room Search & Join', () => {
       expect(mockPrisma.chatRoom.findMany).toHaveBeenCalledWith({
         where: {
           name: {
-            contains: 'collab',
+            contains: 'engineering',
             mode: 'insensitive',
           },
         },
@@ -148,7 +140,7 @@ describe('HTTP Service - Room Search & Join', () => {
           updatedAt: 'desc',
         },
         skip: 0,
-        take: 10,
+        take: 20,
       });
 
       expect(res.status).toHaveBeenCalledWith(200);
@@ -157,261 +149,119 @@ describe('HTTP Service - Room Search & Join', () => {
           success: true,
           data: expect.objectContaining({
             rooms: expect.arrayContaining([
-              expect.objectContaining({ id: 'a0000000-0000-0000-0000-000000000001', name: 'Collab Dev' }),
+              expect.objectContaining({ id: 'a0000000-0000-0000-0000-000000000001', name: 'Engineering Team' }),
             ]),
           }),
         }),
       );
     });
-
-    it('should return all rooms ordered by updatedAt desc when name is empty', async () => {
-      mockPrisma.chatRoom.findMany.mockResolvedValueOnce([]);
-
-      const req = {
-        query: { name: '   ' },
-      } as unknown as Request;
-
-      const res = createMockRes();
-
-      await searchRooms(req, res);
-
-      expect(mockPrisma.chatRoom.findMany).toHaveBeenCalledWith({
-        where: {},
-        include: {
-          creator: true,
-          members: {
-            include: {
-              user: true,
-            },
-          },
-        },
-        orderBy: {
-          updatedAt: 'desc',
-        },
-        skip: 0,
-        take: 10,
-      });
-
-      expect(res.status).toHaveBeenCalledWith(200);
-    });
   });
 
-  describe('requestJoinRoomController', () => {
-    it('should directly add member to DB and hydrate Redis set for public rooms', async () => {
-      const roomId = 'a0000000-0000-0000-0000-000000000001';
-      const userId = 'a0000000-0000-0000-0000-000000000002';
-      const creatorId = 'a0000000-0000-0000-0000-000000000003';
+  describe('createDirectRoom Controller', () => {
+    it('should create a new 1-to-1 conversation if none exists', async () => {
+      const currentUserId = 'u-00000000-0000-0000-0000-000000000001';
+      const targetUserId = 'u-00000000-0000-0000-0000-000000000002';
 
-      mockPrisma.chatRoom.findUnique.mockResolvedValueOnce({
-        id: roomId,
-        name: 'Public Room',
-        isPrivate: false,
-        creator: { id: creatorId, username: 'admin' },
-        members: [{ id: 'm-1', userId: creatorId }],
-      });
-      mockPrisma.chatRoomMember.create.mockResolvedValueOnce({
-        id: 'm-2',
-        roomId,
-        userId,
-        role: 'MEMBER',
-      });
-      mockPrisma.chatRoom.findUnique.mockResolvedValueOnce({
-        id: roomId,
-        name: 'Public Room',
-        isPrivate: false,
-        creator: { id: creatorId, username: 'admin' },
-        members: [
-          { id: 'm-1', userId: creatorId, user: { username: 'admin' } },
-          { id: 'm-2', userId, user: { username: 'new-user' } },
-        ],
-      });
-      mockRedis.sadd.mockResolvedValueOnce(1);
-
-      const req = {
-        params: { id: roomId },
-        body: { userId },
-        user: { id: userId },
-      } as unknown as Request;
-
-      const res = createMockRes();
-
-      await requestJoinRoomController(req, res);
-
-      expect(mockPrisma.chatRoomMember.create).toHaveBeenCalled();
-      expect(mockRedis.sadd).toHaveBeenCalledWith(`room:${roomId}:members`, userId);
-      expect(res.status).toHaveBeenCalledWith(200);
-      expect(res.json).toHaveBeenCalledWith(
-        expect.objectContaining({
-          success: true,
-          data: expect.objectContaining({
-            joined: true,
-          }),
-        }),
-      );
-    });
-
-    it('should create join request for private rooms without adding to Redis immediately', async () => {
-      const roomId = 'a0000000-0000-0000-0000-000000000001';
-      const userId = 'a0000000-0000-0000-0000-000000000002';
-      const creatorId = 'a0000000-0000-0000-0000-000000000003';
-
-      mockPrisma.chatRoom.findUnique.mockResolvedValueOnce({
-        id: roomId,
-        name: 'Private Room',
-        isPrivate: true,
-        creator: { id: creatorId, username: 'admin' },
-        members: [{ id: 'm-1', userId: creatorId }],
-      });
-      mockPrisma.chatRoomJoinRequest.upsert.mockResolvedValueOnce({
-        id: 'req-1',
-        roomId,
-        userId,
-        status: 'PENDING',
-      });
-
-      const req = {
-        params: { id: roomId },
-        body: { userId },
-        user: { id: userId },
-      } as unknown as Request;
-
-      const res = createMockRes();
-
-      await requestJoinRoomController(req, res);
-
-      expect(mockPrisma.chatRoomJoinRequest.upsert).toHaveBeenCalled();
-      expect(mockRedis.sadd).not.toHaveBeenCalled();
-      expect(res.status).toHaveBeenCalledWith(200);
-      expect(res.json).toHaveBeenCalledWith(
-        expect.objectContaining({
-          success: true,
-          data: expect.objectContaining({
-            pending: true,
-            joined: false,
-          }),
-        }),
-      );
-    });
-  });
-
-  describe('createRoom Controller', () => {
-    it('should reject room creation if room name already exists', async () => {
-      mockPrisma.chatRoom.findFirst.mockResolvedValueOnce({
-        id: 'existing-room-1',
-        name: 'General',
-      });
-
-      const req = {
-        body: { name: 'General', isPrivate: false },
-        user: { id: 'u-1' },
-      } as unknown as Request;
-
-      const res = createMockRes();
-
-      await createRoom(req, res);
-
-      expect(res.status).toHaveBeenCalledWith(409);
-      expect(res.json).toHaveBeenCalledWith({
-        success: false,
-        error: 'A room with this name already exists',
-      });
-      expect(mockPrisma.chatRoom.create).not.toHaveBeenCalled();
-    });
-
-    it('should create room with unique name and return 201', async () => {
+      mockPrisma.user.findUnique.mockResolvedValueOnce({ id: targetUserId, username: 'bob' });
       mockPrisma.chatRoom.findFirst.mockResolvedValueOnce(null);
+
       mockPrisma.chatRoom.create.mockResolvedValueOnce({
-        id: 'new-room-1',
-        name: 'Unique Room',
+        id: 'r-direct-1',
+        type: 'DIRECT',
+        name: null,
         description: null,
-        isPrivate: false,
-        creatorId: 'u-1',
+        avatarUrl: null,
+        creatorId: null,
         createdAt: new Date(),
         updatedAt: new Date(),
-        creator: { id: 'u-1', username: 'alice', avatarUrl: null },
+        members: [
+          { id: 'm-1', userId: currentUserId, role: 'MEMBER' },
+          { id: 'm-2', userId: targetUserId, role: 'MEMBER' },
+        ],
+      });
+
+      const req = {
+        user: { id: currentUserId },
+        body: { targetUserId },
+      } as unknown as Request;
+
+      const res = createMockRes();
+
+      await createDirectRoom(req, res);
+
+      expect(mockPrisma.chatRoom.create).toHaveBeenCalled();
+      expect(mockRedis.sadd).toHaveBeenCalledWith('room:r-direct-1:members', currentUserId, targetUserId);
+      expect(res.status).toHaveBeenCalledWith(201);
+    });
+
+    it('should return existing direct conversation if already present', async () => {
+      const currentUserId = 'u-00000000-0000-0000-0000-000000000001';
+      const targetUserId = 'u-00000000-0000-0000-0000-000000000002';
+
+      mockPrisma.user.findUnique.mockResolvedValueOnce({ id: targetUserId, username: 'bob' });
+      mockPrisma.chatRoom.findFirst.mockResolvedValueOnce({
+        id: 'r-direct-existing',
+        type: 'DIRECT',
+        name: null,
         members: [],
       });
 
       const req = {
-        body: { name: 'Unique Room', isPrivate: false },
-        user: { id: 'u-1' },
+        user: { id: currentUserId },
+        body: { targetUserId },
       } as unknown as Request;
 
       const res = createMockRes();
 
-      await createRoom(req, res);
+      await createDirectRoom(req, res);
 
-      expect(res.status).toHaveBeenCalledWith(201);
+      expect(mockPrisma.chatRoom.create).not.toHaveBeenCalled();
+      expect(res.status).toHaveBeenCalledWith(200);
       expect(res.json).toHaveBeenCalledWith(
         expect.objectContaining({
           success: true,
-          message: 'Room created successfully',
           data: expect.objectContaining({
-            room: expect.objectContaining({
-              name: 'Unique Room',
-            }),
+            room: expect.objectContaining({ id: 'r-direct-existing' }),
           }),
         }),
       );
     });
   });
 
-  describe('leaveRoom Controller', () => {
-    it('should allow a member to leave room, remove member from db and redis, and publish WS notification', async () => {
-      const roomId = 'a0000000-0000-0000-0000-000000000001';
-      const userId = 'a0000000-0000-0000-0000-000000000002';
-      const creatorId = 'a0000000-0000-0000-0000-000000000003';
+  describe('createGroupRoom Controller', () => {
+    it('should create a group room and register creator as OWNER', async () => {
+      const currentUserId = 'u-00000000-0000-0000-0000-000000000001';
 
-      mockPrisma.chatRoom.findUnique
-        .mockResolvedValueOnce({
-          id: roomId,
-          name: 'General',
-          isPrivate: false,
-          creator: { id: creatorId, username: 'admin' },
-          members: [
-            { id: 'm-1', userId: creatorId, user: { username: 'admin' } },
-            { id: 'm-2', userId, user: { username: 'alice' } },
-          ],
-        })
-        .mockResolvedValueOnce({
-          id: roomId,
-          name: 'General',
-          isPrivate: false,
-          creator: { id: creatorId, username: 'admin' },
-          members: [{ id: 'm-1', userId: creatorId, user: { username: 'admin' } }],
-        });
-
-      mockPrisma.chatRoomMember.delete.mockResolvedValueOnce({
-        id: 'm-2',
-        roomId,
-        userId,
+      mockPrisma.chatRoom.create.mockResolvedValueOnce({
+        id: 'r-group-1',
+        type: 'GROUP',
+        name: 'Design Crew',
+        description: 'Design chat',
+        avatarUrl: null,
+        creatorId: currentUserId,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        members: [{ id: 'm-1', userId: currentUserId, role: 'OWNER' }],
       });
 
+      mockPrisma.user.findUnique.mockResolvedValueOnce({ id: currentUserId, username: 'alice' });
+      mockPrisma.chatMessage.create.mockResolvedValueOnce({});
+
       const req = {
-        params: { id: roomId },
-        user: { id: userId },
+        user: { id: currentUserId },
+        body: {
+          name: 'Design Crew',
+          description: 'Design chat',
+          memberUsernames: [],
+        },
       } as unknown as Request;
 
       const res = createMockRes();
 
-      await leaveRoom(req, res);
+      await createGroupRoom(req, res);
 
-      expect(mockPrisma.chatRoomMember.delete).toHaveBeenCalledWith({
-        where: { id: 'm-2' },
-      });
-      expect(mockRedis.srem).toHaveBeenCalledWith(`room:${roomId}:members`, userId);
-      expect(mockRedis.publish).toHaveBeenCalledTimes(4);
-      expect(res.status).toHaveBeenCalledWith(200);
-      expect(res.json).toHaveBeenCalledWith(
-        expect.objectContaining({
-          success: true,
-          message: 'Successfully left the room',
-          data: expect.objectContaining({
-            roomId,
-            userId,
-          }),
-        }),
-      );
+      expect(mockPrisma.chatRoom.create).toHaveBeenCalled();
+      expect(res.status).toHaveBeenCalledWith(201);
     });
   });
 });

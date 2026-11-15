@@ -13,7 +13,6 @@ export const editMessageText = async (req: Request, res: Response) => {
       where: { id },
       data: {
         text,
-        modifiedAt: new Date(),
         updatedAt: new Date(),
       },
       include: {

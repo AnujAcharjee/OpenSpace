@@ -8,7 +8,6 @@ import {
   roomJoinedPayloadSchema,
   roomUpdatedPayloadSchema,
   roomDeletedPayloadSchema,
-  roomJoinRequestedPayloadSchema,
   type WsMessage,
 } from '@repo/validation';
 import { redisSub } from './redis.js';
@@ -101,14 +100,7 @@ export class SubscriptionManager {
             payload: payload.data,
           };
         }
-      } else if (raw.type === 'room_join_requested') {
-        const payload = roomJoinRequestedPayloadSchema.safeParse(raw.payload ?? raw);
-        if (payload.success) {
-          wsMessage = {
-            type: 'room_join_requested',
-            payload: payload.data,
-          };
-        }
+
       }
 
       if (!wsMessage) {
@@ -179,14 +171,7 @@ export class SubscriptionManager {
             payload: payload.data,
           };
         }
-      } else if (raw.type === 'room_join_requested') {
-        const payload = roomJoinRequestedPayloadSchema.safeParse(raw.payload ?? raw);
-        if (payload.success) {
-          wsMessage = {
-            type: 'room_join_requested',
-            payload: payload.data,
-          };
-        }
+
       }
 
       if (!wsMessage) {

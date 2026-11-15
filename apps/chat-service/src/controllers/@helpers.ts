@@ -16,7 +16,6 @@ export type ChatMessageRecord = {
     isDeleted?: boolean;
   };
   isDeleted: boolean;
-  modifiedAt?: string;
   createdAt: string;
   updatedAt: string;
   senderUsername: string;
@@ -46,7 +45,6 @@ export function toChatMessageRecord(
         }
       : undefined,
     isDeleted: message.isDeleted,
-    modifiedAt: message.modifiedAt?.toISOString(),
     createdAt: message.createdAt.toISOString(),
     updatedAt: message.updatedAt.toISOString(),
     senderUsername: message.user?.username ?? 'Unknown',
@@ -76,14 +74,14 @@ export async function isUserInRoom(roomId: string, userId: string): Promise<bool
     return true;
   }
 
-  // Double check if the user is the room creator or if the room is public
+  // Double check if the user is the room creator
   if (prisma?.chatRoom) {
     const room = await prisma.chatRoom.findUnique({
       where: { id: roomId },
-      select: { creatorId: true, isPrivate: true },
+      select: { creatorId: true },
     });
 
-    if (room && (room.creatorId === userId || !room.isPrivate)) {
+    if (room && room.creatorId === userId) {
       await redis.sadd(cacheKey, userId);
       await redis.expire(cacheKey, 86400);
       return true;

@@ -1,9 +1,11 @@
 import type { Request, Response } from 'express';
 import type { CreateRoomInput } from '@repo/validation';
 import crypto from 'crypto';
-import { prisma, Prisma } from '@repo/db';
+import { prisma, Prisma, RoomMemberRole } from '@repo/db';
 import { redis } from '../../lib/redis.js';
 import { toRoomRecord } from '../@helpers.js';
+import { createDirectRoom } from './createDirectRoom.js';
+import { createGroupRoom } from './createGroupRoom.js';
 
 export const createRoom = async (req: Request, res: Response) => {
   const data = req.body as CreateRoomInput;
@@ -16,20 +18,14 @@ export const createRoom = async (req: Request, res: Response) => {
     });
   }
 
-  const existingRoom = await prisma.chatRoom.findFirst({
-    where: {
-      name: {
-        equals: data.name.trim(),
-        mode: 'insensitive',
-      },
-    },
-  });
+  // If direct conversation is requested
+  if (data.type === 'DIRECT' && data.targetUserId) {
+    return createDirectRoom(req, res);
+  }
 
-  if (existingRoom) {
-    return res.status(409).json({
-      success: false,
-      error: 'A room with this name already exists',
-    });
+  // If group name is supplied, create a group conversation
+  if (data.name) {
+    return createGroupRoom(req, res);
   }
 
   const roomId = crypto.randomUUID();
@@ -38,18 +34,17 @@ export const createRoom = async (req: Request, res: Response) => {
     const room = await prisma.chatRoom.create({
       data: {
         id: roomId,
-        name: data.name.trim(),
+        type: 'GROUP',
+        name: data.name?.trim() || 'Untitled Chat',
         description: data.description ?? null,
         avatarUrl: data.avatarUrl ?? null,
-        topics: data.topics ?? [],
-        isPrivate: data.isPrivate,
         creatorId,
         updatedAt: new Date(),
         members: {
           create: {
             id: crypto.randomUUID(),
             userId: creatorId,
-            role: 'OWNER',
+            role: RoomMemberRole.OWNER,
           },
         },
       },
@@ -68,7 +63,7 @@ export const createRoom = async (req: Request, res: Response) => {
     try {
       await redis.sadd(`room:${roomId}:members`, creatorId);
       await redis.expire(`room:${roomId}:members`, 86400);
-    } catch (err) {
+    } catch {
       // Non-blocking cache
     }
 

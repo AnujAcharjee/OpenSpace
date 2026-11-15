@@ -2,9 +2,8 @@ import {
   type User,
   type ChatRoom,
   type ChatRoomMember,
-  type ChatRoomJoinRequest,
 } from '@repo/db';
-import type { RoomJoinRequestRecord, RoomMemberRecord, RoomRecord, UserRecord } from '@repo/validation';
+import type { RoomMemberRecord, RoomRecord, UserRecord } from '@repo/validation';
 
 export function toUserRecord(user: User): UserRecord {
   return {
@@ -31,19 +30,6 @@ export function toRoomMemberRecord(member: ChatRoomMember & { user?: User | null
   };
 }
 
-export function toRoomJoinRequestRecord(
-  joinRequest: ChatRoomJoinRequest & { user?: User | null },
-): RoomJoinRequestRecord {
-  return {
-    id: joinRequest.id,
-    roomId: joinRequest.roomId,
-    userId: joinRequest.userId,
-    status: joinRequest.status,
-    createdAt: joinRequest.createdAt?.toISOString() ?? new Date(0).toISOString(),
-    user: joinRequest.user ? toUserRecord(joinRequest.user) : null,
-  };
-}
-
 export function toRoomRecord(
   room: ChatRoom & {
     creator?: User | null;
@@ -52,11 +38,10 @@ export function toRoomRecord(
 ): RoomRecord {
   return {
     id: room.id,
-    name: room.name,
+    type: room.type,
+    name: room.name ?? null,
     description: room.description ?? null,
     avatarUrl: room.avatarUrl ?? null,
-    topics: room.topics ?? [],
-    isPrivate: room.isPrivate,
     creatorId: room.creatorId ?? null,
     createdAt: room.createdAt?.toISOString() ?? new Date(0).toISOString(),
     updatedAt: room.updatedAt?.toISOString() ?? new Date(0).toISOString(),

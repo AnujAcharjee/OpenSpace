@@ -5,9 +5,8 @@ import { toRoomRecord } from '../@helpers.js';
 
 export const searchRooms = async (req: Request, res: Response) => {
   const queryName = typeof req.query.name === 'string' ? req.query.name.trim() : '';
-  const queryTopic = typeof req.query.topic === 'string' ? req.query.topic.trim() : '';
   const page = Math.max(1, parseInt(String(req.query.page ?? '1'), 10) || 1);
-  const limit = Math.min(50, Math.max(1, parseInt(String(req.query.limit ?? '10'), 10) || 10));
+  const limit = Math.min(50, Math.max(1, parseInt(String(req.query.limit ?? '20'), 10) || 20));
   const skip = (page - 1) * limit;
 
   const where: any = {};
@@ -15,11 +14,6 @@ export const searchRooms = async (req: Request, res: Response) => {
     where.name = {
       contains: queryName,
       mode: 'insensitive' as const,
-    };
-  }
-  if (queryTopic && queryTopic.toLowerCase() !== 'all') {
-    where.topics = {
-      has: queryTopic,
     };
   }
 
