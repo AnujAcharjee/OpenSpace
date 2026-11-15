@@ -586,13 +586,8 @@ export default function ChannelsSection() {
     <Card className="h-full w-full flex flex-col border border-[#d4a03d]/40 dark:border-line bg-paper rounded-[var(--radius-sketch-md)] overflow-hidden shadow-xs">
       {/* ─── TOP BAR ─── */}
       <div className="p-3 pb-2 border-b border-line flex items-center justify-between gap-2 shrink-0">
-        <div className="flex flex-col min-w-0">
+        <div className="flex items-center min-w-0">
           <AppIcon size="sm" />
-          {user && (
-            <p className="text-[11px] text-ink-muted truncate mt-0.5 font-medium pl-0.5">
-              @{user.username}
-            </p>
-          )}
         </div>
 
         <div className="flex items-center gap-1 shrink-0">
