@@ -6,7 +6,6 @@ import {
   roomJoinedPayloadSchema,
   roomUpdatedPayloadSchema,
   roomDeletedPayloadSchema,
-  roomJoinRequestedPayloadSchema,
 } from "@repo/validation"
 import useAppStore from "@/stores/app-store"
 import { wsClient } from "@/ws"
@@ -70,7 +69,7 @@ export const handlers: Record<string, (payload: unknown) => void> = {
         setActiveRoom(null)
       }
 
-      toast.info(`Channel ${data.roomName ? `"${data.roomName}" ` : ""}has been deleted`, {
+      toast.info(`Chat ${data.roomName ? `"${data.roomName}" ` : ""}has been deleted`, {
         position: "top-center",
       })
     } catch {}
@@ -91,16 +90,9 @@ export const handlers: Record<string, (payload: unknown) => void> = {
         setActiveRoom(null)
       }
 
-      toast.error("You have been removed from the channel and can no longer send messages.", {
+      toast.error("You have been removed from the group and can no longer send messages.", {
         position: "top-center",
       })
-    } catch {}
-  },
-  room_join_requested: (payload) => {
-    try {
-      const data = roomJoinRequestedPayloadSchema.parse(payload)
-      const { addJoinRequest } = useAppStore.getState()
-      addJoinRequest(data.roomId, data.request)
     } catch {}
   },
 }

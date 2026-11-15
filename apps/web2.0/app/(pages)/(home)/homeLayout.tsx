@@ -6,7 +6,6 @@ import ChannelsSection from "./channels"
 import { useIsLargeScreen } from "@/hooks/useIsLargeScreen"
 import { useHomePage } from "@/hooks/useHomePage"
 import { useUserWs } from "@/hooks/useUserWs"
-import useAppStore from "@/stores/app-store"
 import {
   ResizableHandle,
   ResizablePanel,
@@ -19,7 +18,6 @@ import { IconLoader2 } from "@tabler/icons-react"
 export default function HomeLayout() {
   const { hasHydrated, isLoading, fetch, user, isCurrentUser, activeRoom } = useHomePage()
   const isLg = useIsLargeScreen()
-  const isExploringChannels = useAppStore((s) => s.isExploringChannels)
 
   useUserWs(isCurrentUser ? user : null)
 
@@ -46,8 +44,10 @@ export default function HomeLayout() {
     )
   }
 
-  const showSidebar = isLg || (!activeRoom && !isExploringChannels)
-  const showChat = isLg || !!activeRoom || isExploringChannels
+  // Mobile first: show sidebar if large screen OR no chat is currently selected
+  const showSidebar = isLg || !activeRoom
+  // Show chat if large screen OR a chat is active
+  const showChat = isLg || !!activeRoom
 
   return (
     <div className="relative flex h-svh w-full overflow-hidden bg-paper bg-[radial-gradient(ellipse_at_top_right,rgba(212,160,61,0.06),transparent_50%),radial-gradient(ellipse_at_bottom_left,rgba(59,122,119,0.04),transparent_50%)] p-1.5 sm:p-2.5">

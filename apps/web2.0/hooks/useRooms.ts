@@ -8,13 +8,8 @@ import type {
   AddRoomMembersRequest,
   CreateRoomInput,
   EditRoomRequest,
-  GetPendingJoinRequestsRequest,
   RemoveRoomMemberRequest,
   RoomRecord,
-  RoomJoinRequestRecord,
-  RequestJoinRoomRequest,
-  RespondJoinRequestRequest,
-  SearchRoomsRequest,
 } from "@repo/validation"
 
 type RoomResponse = {
@@ -51,34 +46,6 @@ type RemoveRoomMemberResponse = {
   message?: string
 }
 
-type RequestJoinRoomResponse = {
-  data?: {
-    room?: RoomRecord | null
-    joined?: boolean
-    pending?: boolean
-  }
-  error?: string
-  message?: string
-}
-
-type GetPendingJoinRequestsResponse = {
-  data?: {
-    requests?: RoomJoinRequestRecord[]
-  }
-  error?: string
-  message?: string
-}
-
-type RespondJoinRequestResponse = {
-  data?: {
-    success?: boolean
-    requestId?: string
-    room?: RoomRecord | null
-  }
-  error?: string
-  message?: string
-}
-
 export const useRooms = () => {
   const createRoom = useCallback(async (payload: CreateRoomInput) => {
     const res = await axios.post<RoomResponse>(roomsApiUrl, payload, {
@@ -92,6 +59,36 @@ export const useRooms = () => {
 
     return room
   }, [])
+
+  const createDirectRoom = useCallback(async (participantId: string) => {
+    const res = await axios.post<RoomResponse>(
+      `${roomsApiUrl}/direct`,
+      { participantId },
+      { withCredentials: true }
+    )
+    const room = res.data.data?.room
+    if (!room) throw new Error("Direct room was not returned")
+    return room
+  }, [])
+
+  const createGroupRoom = useCallback(
+    async (payload: {
+      name: string
+      description?: string
+      avatarUrl?: string | null
+      memberUsernames?: string[]
+    }) => {
+      const res = await axios.post<RoomResponse>(
+        `${roomsApiUrl}/group`,
+        payload,
+        { withCredentials: true }
+      )
+      const room = res.data.data?.room
+      if (!room) throw new Error("Group room was not returned")
+      return room
+    },
+    []
+  )
 
   const updateRoom = useCallback(
     async (roomId: string, payload: EditRoomRequest["body"]) => {
@@ -184,7 +181,6 @@ export const useRooms = () => {
     async (
       params?: {
         name?: string
-        topic?: string
         page?: number
         limit?: number
       } | string
@@ -216,69 +212,6 @@ export const useRooms = () => {
         page,
         rooms,
       })
-    },
-    []
-  )
-
-  const requestJoinRoom = useCallback(
-    async (
-      roomId: string,
-      userId: RequestJoinRoomRequest["body"]["userId"]
-    ) => {
-      const res = await axios.post<RequestJoinRoomResponse>(
-        `${roomsApiUrl}/${roomId}/join`,
-        { userId },
-        {
-          withCredentials: true,
-        }
-      )
-
-      return {
-        room: res.data.data?.room ?? null,
-        joined: res.data.data?.joined ?? false,
-        pending: res.data.data?.pending ?? false,
-      }
-    },
-    []
-  )
-
-  const getPendingJoinRequests = useCallback(
-    async (
-      roomId: string,
-      actorUserId: GetPendingJoinRequestsRequest["query"]["actorUserId"]
-    ) => {
-      const res = await axios.get<GetPendingJoinRequestsResponse>(
-        `${roomsApiUrl}/${roomId}/join-requests`,
-        {
-          params: { actorUserId },
-          withCredentials: true,
-        }
-      )
-
-      return res.data.data?.requests ?? []
-    },
-    []
-  )
-
-  const respondJoinRequest = useCallback(
-    async (
-      roomId: string,
-      requestId: RespondJoinRequestRequest["params"]["requestId"],
-      payload: RespondJoinRequestRequest["body"]
-    ) => {
-      const res = await axios.post<RespondJoinRequestResponse>(
-        `${roomsApiUrl}/${roomId}/join-requests/${requestId}/respond`,
-        payload,
-        {
-          withCredentials: true,
-        }
-      )
-
-      return {
-        success: res.data.data?.success ?? false,
-        requestId: res.data.data?.requestId ?? requestId,
-        room: res.data.data?.room ?? null,
-      }
     },
     []
   )
@@ -319,6 +252,8 @@ export const useRooms = () => {
 
   return {
     createRoom,
+    createDirectRoom,
+    createGroupRoom,
     updateRoom,
     deleteRoom,
     leaveRoom,
@@ -326,8 +261,5 @@ export const useRooms = () => {
     addMembers,
     removeMember,
     searchRooms,
-    requestJoinRoom,
-    getPendingJoinRequests,
-    respondJoinRequest,
   }
 }

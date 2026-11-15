@@ -5,11 +5,10 @@ import type { RoomRecord } from '@repo/validation';
 describe('useRoomPermissions hook', () => {
   const mockRoom: RoomRecord = {
     id: 'room-1',
+    type: 'GROUP',
     name: 'test-channel',
     description: 'Test channel description',
     avatarUrl: null,
-    topics: ['general'],
-    isPrivate: false,
     creatorId: 'user-owner',
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',

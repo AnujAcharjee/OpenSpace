@@ -4,9 +4,7 @@ import { useMessage, type ChatHistoryMessage } from "@/hooks/useMessage"
 import { useRooms } from "@/hooks/useRooms"
 import type {
   AddRoomMembersRequest,
-  CreateMessageInput,
   EditRoomRequest,
-  RoomJoinRequestRecord,
   RoomMemberRecord,
   RoomRecord,
 } from "@repo/validation"
@@ -14,7 +12,7 @@ import type { RoomMessage } from "@/stores/app-store"
 import { toast } from "sonner"
 import axios from "axios"
 import { wsClient } from "@/ws"
-import { uploadChatAttachment, type ChatAttachment } from "@/utils/cloudinary"
+import { uploadChatAttachment } from "@/utils/cloudinary"
 
 export interface StagedAttachment {
   file: File
@@ -25,7 +23,6 @@ export interface StagedAttachment {
 }
 
 const EMPTY_ROOM_MESSAGES: RoomMessage[] = []
-const EMPTY_JOIN_REQUESTS: RoomJoinRequestRecord[] = []
 const toastOptions = { position: "top-center" as const }
 
 // ─── Mappers ────────────────────────────────────────────────────────────────
@@ -98,14 +95,20 @@ function useMessages(room: RoomRecord | null, userId: string | undefined) {
       if (!cached || cached.length === 0) {
         setIsLoading(true)
       }
-
       try {
-        const messages = (await fetchMessages(roomId, userId ?? "")).map(
-          toRoomMessage
-        )
-        if (!isCancelled) setMessages(roomId, messages)
+        const history = await fetchMessages(roomId, userId || "")
+        if (!isCancelled) {
+          setMessages(roomId, history.map(toRoomMessage))
+        }
       } catch (error) {
-        console.warn("Unable to load messages:", error)
+        if (!isCancelled) {
+          const message = axios.isAxiosError(error)
+            ? (error.response?.data?.error ??
+              error.response?.data?.message ??
+              "Unable to load messages")
+            : "Unable to load messages"
+          toast.error(message, toastOptions)
+        }
       } finally {
         if (!isCancelled) setIsLoading(false)
       }
@@ -115,34 +118,24 @@ function useMessages(room: RoomRecord | null, userId: string | undefined) {
     return () => {
       isCancelled = true
     }
-  }, [fetchMessages, roomId, setMessages, userId])
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" })
-  }, [roomId, roomMessages.length])
+  }, [roomId, userId, fetchMessages, setMessages])
 
   return { roomMessages, isLoading, messagesEndRef }
 }
 
-// ─── useReply ────────────────────────────────────────────────────────────────
+// ─── useReply ───────────────────────────────────────────────────────────────
 
 function useReply(roomMessages: RoomMessage[]) {
   const [replyingTo, setReplyingTo] = useState<RoomMessage | null>(null)
 
-  useEffect(() => {
-    if (replyingTo && !roomMessages.some((m) => m.id === replyingTo.id)) {
-      setReplyingTo(null)
-    }
-  }, [replyingTo, roomMessages])
+  const clearReply = useCallback(() => {
+    setReplyingTo(null)
+  }, [])
 
-  return {
-    replyingTo,
-    setReplyingTo,
-    clearReply: () => setReplyingTo(null),
-  }
+  return { replyingTo, setReplyingTo, clearReply }
 }
 
-// ─── useMembersPanel ─────────────────────────────────────────────────────────
+// ─── useMembersPanel ────────────────────────────────────────────────────────
 
 function useMembersPanel(roomId: string | null) {
   const [showMembersPanel, setShowMembersPanel] = useState(false)
@@ -151,192 +144,205 @@ function useMembersPanel(roomId: string | null) {
     setShowMembersPanel(false)
   }, [roomId])
 
-  return {
-    showMembersPanel,
-    toggleMembersPanel: () => setShowMembersPanel((c) => !c),
-    closeMembersPanel: () => setShowMembersPanel(false),
-  }
+  const toggleMembersPanel = useCallback(() => {
+    setShowMembersPanel((prev) => !prev)
+  }, [])
+
+  const closeMembersPanel = useCallback(() => {
+    setShowMembersPanel(false)
+  }, [])
+
+  return { showMembersPanel, toggleMembersPanel, closeMembersPanel }
 }
 
-// ─── useSendMessage with Browser Draft Caching ──────────────────────────────
+// ─── useDeleteMessage ───────────────────────────────────────────────────────
+
+function useDeleteMessage(
+  roomId: string,
+  userId: string,
+  replyingTo: RoomMessage | null,
+  clearReply: () => void
+) {
+  const { deleteMessage: deleteMessageApi } = useMessage()
+  const removeMessage = useAppStore((s) => s.removeMessage)
+  const [deletingMessageId, setDeletingMessageId] = useState<string | null>(null)
+
+  const handleDeleteMessage = useCallback(
+    async (messageId: string) => {
+      if (!roomId || deletingMessageId) return
+      setDeletingMessageId(messageId)
+
+      try {
+        await deleteMessageApi(messageId)
+        removeMessage(roomId, messageId)
+        if (replyingTo?.id === messageId) clearReply()
+        toast.success("Message deleted", toastOptions)
+      } catch (error) {
+        const message = axios.isAxiosError(error)
+          ? (error.response?.data?.error ??
+            error.response?.data?.message ??
+            "Unable to delete message")
+          : "Unable to delete message"
+        toast.error(message, toastOptions)
+      } finally {
+        setDeletingMessageId(null)
+      }
+    },
+    [roomId, deletingMessageId, deleteMessageApi, removeMessage, replyingTo, clearReply]
+  )
+
+  return { deletingMessageId, handleDeleteMessage }
+}
+
+// ─── useSendMessage ─────────────────────────────────────────────────────────
 
 function useSendMessage(
   room: RoomRecord | null,
   userId: string,
   replyingTo: RoomMessage | null,
-  onSent: () => void,
-  currentUser?: { username?: string; avatarUrl?: string | null } | null
+  clearReply: () => void,
+  user: any
 ) {
+  const roomId = room?.id ?? ""
+  const { createMessage } = useMessage()
   const addMessage = useAppStore((s) => s.addMessage)
   const replaceMessage = useAppStore((s) => s.replaceMessage)
-  const updateMessageStatus = useAppStore((s) => s.updateMessageStatus)
   const updateRoomLastMessage = useAppStore((s) => s.updateRoomLastMessage)
-  const storeDraft = useAppStore((s) => (room ? s.drafts[room.id] ?? "" : ""))
-  const setRoomDraft = useAppStore((s) => s.setRoomDraft)
-  const { createMessage } = useMessage()
 
-  const [draft, setDraftState] = useState(storeDraft)
+  const draft = useAppStore((s) => (roomId ? (s.drafts[roomId] ?? "") : ""))
+  const setDraft = useCallback(
+    (text: string) => {
+      if (roomId) useAppStore.getState().setRoomDraft(roomId, text)
+    },
+    [roomId]
+  )
+
   const [isSending, setIsSending] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [stagedAttachment, setStagedAttachment] = useState<StagedAttachment | null>(null)
 
-  // Sync draft when room switches
-  useEffect(() => {
-    if (room) {
-      setDraftState(useAppStore.getState().drafts[room.id] ?? "")
-    } else {
-      setDraftState("")
+  const stageAttachment = useCallback((file: File) => {
+    let type: StagedAttachment["type"] = "FILE"
+    if (file.type.startsWith("image/")) {
+      type = "IMAGE"
+    } else if (file.type === "application/pdf") {
+      type = "PDF"
     }
-  }, [room?.id])
+    const previewUrl = URL.createObjectURL(file)
+    setStagedAttachment({ file, previewUrl, type, name: file.name, size: file.size })
+  }, [])
 
-  const setDraft = useCallback((value: string) => {
-    setDraftState(value)
-    if (room) {
-      setRoomDraft(room.id, value)
-    }
-  }, [room, setRoomDraft])
-
-  const clearStagedAttachment = () => {
+  const clearStagedAttachment = useCallback(() => {
     if (stagedAttachment?.previewUrl) {
       URL.revokeObjectURL(stagedAttachment.previewUrl)
     }
     setStagedAttachment(null)
     setUploadProgress(0)
-  }
+  }, [stagedAttachment])
 
-  const stageAttachment = (file: File) => {
-    const isImage = file.type.startsWith("image/")
-    const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")
+  const sendMessage = useCallback(
+    async (textToSend?: string) => {
+      const text = (textToSend ?? draft).trim()
+      if (!roomId || (!text && !stagedAttachment) || isSending) return
 
-    if (!isImage && !isPdf) {
-      toast.error("Only images and PDFs are supported", toastOptions)
-      return
-    }
+      const clientMessageId = crypto.randomUUID()
+      const timestamp = new Date().toISOString()
+      let attachmentsString: string | undefined
 
-    const MAX_SIZE_BYTES = 25 * 1024 * 1024 // 25 MB
-    if (file.size > MAX_SIZE_BYTES) {
-      toast.error("File size exceeds 25 MB limit", toastOptions)
-      return
-    }
-
-    if (stagedAttachment?.previewUrl) {
-      URL.revokeObjectURL(stagedAttachment.previewUrl)
-    }
-
-    const previewUrl = isImage ? URL.createObjectURL(file) : ""
-    setStagedAttachment({
-      file,
-      previewUrl,
-      type: isImage ? "IMAGE" : isPdf ? "PDF" : "FILE",
-      name: file.name,
-      size: file.size,
-    })
-    setUploadProgress(0)
-  }
-
-  async function sendMessage(textOverride?: string) {
-    if (!room) return
-    const text = (textOverride !== undefined ? textOverride : draft).trim()
-    if ((!text && !stagedAttachment) || !userId) return
-
-    const pendingAttachment = stagedAttachment
-    const replyTarget = replyingTo
-    const optimisticId = `temp-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
-
-    // Create optimistic message to display immediately in the UI (0ms instant feel)
-    const optimisticMessage: RoomMessage = {
-      id: optimisticId,
-      sender: userId,
-      roomId: room.id,
-      text: text.length > 0 ? text : undefined,
-      attachments: pendingAttachment
-        ? JSON.stringify([
-            {
-              id: `temp-att-${Date.now()}`,
-              url: pendingAttachment.previewUrl || "",
-              name: pendingAttachment.name,
-              size: pendingAttachment.size,
-              mimeType: pendingAttachment.file.type,
-              type: pendingAttachment.type,
-            },
-          ])
-        : undefined,
-      type: pendingAttachment
-        ? pendingAttachment.type === "IMAGE"
-          ? "IMAGE"
-          : "FILE"
-        : "TEXT",
-      parentId: replyTarget?.id,
-      parent: replyTarget
-        ? {
-            id: replyTarget.id,
-            text: replyTarget.text,
-            senderUsername: replyTarget.senderUsername,
-            isDeleted: replyTarget.isDeleted,
-          }
-        : undefined,
-      senderUsername: currentUser?.username || "You",
-      senderAvatarUrl: currentUser?.avatarUrl,
-      createdAt: new Date().toISOString(),
-      isDeleted: false,
-      status: "sending",
-    }
-
-    // Instantly add message to UI & clear inputs
-    addMessage(room.id, optimisticMessage)
-    updateRoomLastMessage(room.id, toRoomPreviewMessage(optimisticMessage))
-    setDraft("")
-    setStagedAttachment(null)
-    onSent()
-    if (pendingAttachment) {
       setIsSending(true)
-    }
 
-    try {
-      let uploadedAttachment: ChatAttachment | null = null
+      try {
+        if (stagedAttachment) {
+          const uploaded = await uploadChatAttachment(
+            stagedAttachment.file,
+            (progress) => setUploadProgress(progress)
+          )
+          attachmentsString = JSON.stringify([uploaded])
+        }
 
-      if (pendingAttachment) {
-        uploadedAttachment = await uploadChatAttachment(
-          pendingAttachment.file,
-          (progress) => setUploadProgress(progress)
-        )
-      }
+        const optimisticMessage: RoomMessage = {
+          id: clientMessageId,
+          type: "TEXT",
+          sender: userId,
+          roomId,
+          text: text || undefined,
+          attachments: attachmentsString,
+          parentId: replyingTo?.id,
+          parent: replyingTo
+            ? {
+                id: replyingTo.id,
+                text: replyingTo.text,
+                senderUsername: replyingTo.senderUsername || "user",
+                isDeleted: replyingTo.isDeleted,
+              }
+            : undefined,
+          createdAt: timestamp,
+          senderUsername: user?.username,
+          senderAvatarUrl: user?.avatarUrl,
+          status: "sending",
+        }
 
-      const payload: CreateMessageInput["body"] = {
-        sender: userId,
-        roomId: room.id,
-        text: text.length > 0 ? text : undefined,
-        attachments: uploadedAttachment ? JSON.stringify([uploadedAttachment]) : undefined,
-        type: uploadedAttachment
-          ? uploadedAttachment.type === "IMAGE"
-            ? "IMAGE"
-            : "FILE"
-          : "TEXT",
-        parentId: replyTarget?.id,
-      }
+        addMessage(roomId, optimisticMessage)
+        updateRoomLastMessage(roomId, toRoomPreviewMessage(optimisticMessage))
+        setDraft("")
+        clearStagedAttachment()
+        clearReply()
 
-      const message = await createMessage(payload)
-      if (pendingAttachment?.previewUrl) {
-        URL.revokeObjectURL(pendingAttachment.previewUrl)
-      }
+        const confirmedMessage = await createMessage({
+          roomId,
+          sender: userId,
+          type: "TEXT",
+          parentId: replyingTo?.id,
+          text: text || undefined,
+          attachments: attachmentsString,
+        })
 
-      // Replace optimistic message with confirmed server message
-      replaceMessage(room.id, optimisticId, {
-        ...toRoomMessage(message),
-        status: "sent",
-      })
-      updateRoomLastMessage(room.id, toRoomPreviewMessage(message))
-    } catch (error) {
-      console.warn("Send message failed:", error)
-      // Mark as failed in UI so "Not sent" in red is shown under message
-      updateMessageStatus(room.id, optimisticId, "failed")
-    } finally {
-      if (pendingAttachment) {
+        replaceMessage(roomId, clientMessageId, toRoomMessage(confirmedMessage))
+        updateRoomLastMessage(roomId, toRoomPreviewMessage(confirmedMessage))
+      } catch (error) {
+        replaceMessage(roomId, clientMessageId, {
+          id: clientMessageId,
+          type: "TEXT",
+          sender: userId,
+          roomId,
+          text: text || undefined,
+          attachments: attachmentsString,
+          parentId: replyingTo?.id,
+          createdAt: timestamp,
+          senderUsername: user?.username,
+          senderAvatarUrl: user?.avatarUrl,
+          status: "failed",
+        })
+
+        const message = axios.isAxiosError(error)
+          ? (error.response?.data?.error ??
+            error.response?.data?.message ??
+            "Unable to send message")
+          : "Unable to send message"
+        toast.error(message, toastOptions)
+      } finally {
         setIsSending(false)
         setUploadProgress(0)
       }
-    }
-  }
+    },
+    [
+      roomId,
+      draft,
+      stagedAttachment,
+      isSending,
+      userId,
+      replyingTo,
+      user?.username,
+      user?.avatarUrl,
+      addMessage,
+      updateRoomLastMessage,
+      setDraft,
+      clearStagedAttachment,
+      clearReply,
+      createMessage,
+      replaceMessage,
+    ]
+  )
 
   return {
     draft,
@@ -350,113 +356,31 @@ function useSendMessage(
   }
 }
 
-// ─── useDeleteMessage ────────────────────────────────────────────────────────
-
-function useDeleteMessage(
-  roomId: string,
-  _userId: string,
-  replyingTo: RoomMessage | null,
-  onClearReply: () => void
-) {
-  const removeMessage = useAppStore((s) => s.removeMessage)
-  const { deleteMessage } = useMessage()
-  const [deletingMessageId, setDeletingMessageId] = useState<string | null>(
-    null
-  )
-
-  async function handleDeleteMessage(messageId: string) {
-    if (deletingMessageId) return
-    setDeletingMessageId(messageId)
-
-    try {
-      const confirmedId = await deleteMessage(messageId)
-      // Only delete from store / IndexedDB once delete confirmation is received
-      if (confirmedId) {
-        removeMessage(roomId, confirmedId)
-        if (replyingTo?.id === confirmedId) onClearReply()
-        toast.success("Message deleted", toastOptions)
-      }
-    } catch (error) {
-      // Do NOT delete from local store. Show explicit error toast.
-      const serverMessage = axios.isAxiosError(error)
-        ? (error.response?.data?.error ??
-          error.response?.data?.message ??
-          "Unable to delete message")
-        : "Unable to delete message"
-
-      const errorMessage = serverMessage.toLowerCase().startsWith("error")
-        ? serverMessage
-        : `Error: ${serverMessage}`
-
-      toast.error(errorMessage, toastOptions)
-    } finally {
-      setDeletingMessageId(null)
-    }
-  }
-
-  return { deletingMessageId, handleDeleteMessage }
-}
-
-// ─── useMessageMeta ──────────────────────────────────────────────────────────
+// ─── useMessageMeta ─────────────────────────────────────────────────────────
 
 function useMessageMeta(
   room: RoomRecord | null,
-  userId: string | undefined,
-  username: string | undefined,
-  avatarUrl: string | null | undefined
+  currentUserId?: string,
+  currentUsername?: string,
+  currentUserAvatarUrl?: string | null
 ) {
-  function getAuthorName(message: RoomMessage) {
-    if (message.sender === userId) {
-      return username ?? "You"
-    }
-
-    if (message.senderUsername && message.senderUsername !== "Unknown") {
-      return message.senderUsername
-    }
-
-    const member = room?.members?.find(
-      (m) => m.userId === message.sender || m.user?.id === message.sender
-    )
-    if (member?.user?.username) {
-      return member.user.username
-    }
-
-    if (room?.creatorId === message.sender && room.creator?.username) {
-      return room.creator.username
-    }
-
-    return "Room member"
+  function getAuthorName(msg: RoomMessage) {
+    if (msg.sender === currentUserId) return "You"
+    if (msg.senderUsername) return msg.senderUsername
+    const member = room?.members.find((m) => m.userId === msg.sender)
+    return member?.user?.name || member?.user?.username || "Unknown"
   }
 
-  function getAuthorAvatar(message: RoomMessage) {
-    if (message.sender === userId) {
-      return avatarUrl ?? undefined
-    }
-
-    if (message.senderAvatarUrl) {
-      return message.senderAvatarUrl
-    }
-
-    const member = room?.members?.find(
-      (m) => m.userId === message.sender || m.user?.id === message.sender
-    )
-    if (member?.user?.avatarUrl) {
-      return member.user.avatarUrl
-    }
-
-    if (room?.creatorId === message.sender && room.creator?.avatarUrl) {
-      return room.creator.avatarUrl
-    }
-
-    return undefined
+  function getAuthorAvatar(msg: RoomMessage): string | null | undefined {
+    if (msg.sender === currentUserId) return currentUserAvatarUrl
+    if (msg.senderAvatarUrl) return msg.senderAvatarUrl
+    const member = room?.members.find((m) => m.userId === msg.sender)
+    return member?.user?.avatarUrl
   }
 
-  function getMessageBody(
-    message?: Pick<RoomMessage, "text" | "isDeleted"> | null
-  ) {
-    if (!message) return "Original message unavailable"
-    if (message.isDeleted) return "Message deleted"
-    return message.text?.trim() ? message.text : "Attachment"
+  function getMessageBody(msg: RoomMessage): string {
+    if (msg.isDeleted) return "This message was deleted"
+    return msg.text || ""
   }
 
   return { getAuthorName, getAuthorAvatar, getMessageBody }
@@ -469,62 +393,13 @@ export function useRoomMembers(
   currentUserId: string | null,
   canManageRoom: boolean
 ) {
-  const {
-    addMembers,
-    removeMember,
-    getPendingJoinRequests,
-    respondJoinRequest,
-  } = useRooms()
-
-  const pendingRequests = useAppStore(
-    (s) => s.joinRequests[room.id] ?? EMPTY_JOIN_REQUESTS
-  )
-  const setStoreJoinRequests = useAppStore((s) => s.setJoinRequests)
-  const removeStoreJoinRequest = useAppStore((s) => s.removeJoinRequest)
+  const { addMembers, removeMember } = useRooms()
 
   const [addMembersOpen, setAddMembersOpen] = useState(false)
-  const [removeTarget, setRemoveTarget] = useState<RoomMemberRecord | null>(
-    null
-  )
-  const [isLoadingPending, setIsLoadingPending] = useState(false)
-  const [processingRequestId, setProcessingRequestId] = useState<string | null>(
-    null
-  )
+  const [removeTarget, setRemoveTarget] = useState<RoomMemberRecord | null>(null)
   const [usernamesInput, setUsernamesInput] = useState("")
   const [isAdding, setIsAdding] = useState(false)
   const [isRemoving, setIsRemoving] = useState(false)
-
-  useEffect(() => {
-    if (!canManageRoom || !currentUserId) {
-      return
-    }
-
-    let isCancelled = false
-
-    const fetchPending = async () => {
-      setIsLoadingPending(true)
-      try {
-        const requests = await getPendingJoinRequests(room.id, currentUserId)
-        if (!isCancelled) setStoreJoinRequests(room.id, requests)
-      } catch (error) {
-        if (!isCancelled) {
-          const message = axios.isAxiosError(error)
-            ? (error.response?.data?.error ??
-              error.response?.data?.message ??
-              "Unable to load join requests")
-            : "Unable to load join requests"
-          toast.error(message, toastOptions)
-        }
-      } finally {
-        if (!isCancelled) setIsLoadingPending(false)
-      }
-    }
-
-    void fetchPending()
-    return () => {
-      isCancelled = true
-    }
-  }, [canManageRoom, currentUserId, getPendingJoinRequests, room.id, setStoreJoinRequests])
 
   async function handleAddMembers() {
     const usernames = usernamesInput
@@ -583,48 +458,17 @@ export function useRoomMembers(
     }
   }
 
-  async function handleRespondJoinRequest(requestId: string, approve: boolean) {
-    if (!currentUserId || processingRequestId) return
-    setProcessingRequestId(requestId)
-
-    try {
-      const result = await respondJoinRequest(room.id, requestId, {
-        actorUserId: currentUserId,
-        approve,
-      })
-      if (result.room) useAppStore.getState().upsertRoom(result.room)
-      removeStoreJoinRequest(room.id, requestId)
-      toast.success(
-        approve ? "Join request approved" : "Join request rejected",
-        toastOptions
-      )
-    } catch (error) {
-      const message = axios.isAxiosError(error)
-        ? (error.response?.data?.error ??
-          error.response?.data?.message ??
-          "Unable to process join request")
-        : "Unable to process join request"
-      toast.error(message, toastOptions)
-    } finally {
-      setProcessingRequestId(null)
-    }
-  }
-
   return {
     addMembersOpen,
     setAddMembersOpen,
     removeTarget,
     setRemoveTarget,
-    pendingRequests,
-    isLoadingPending,
-    processingRequestId,
     usernamesInput,
     setUsernamesInput,
     isAdding,
     isRemoving,
     handleAddMembers,
     handleRemoveMember,
-    handleRespondJoinRequest,
   }
 }
 
@@ -637,15 +481,15 @@ export function useEditRoom(room: RoomRecord) {
   const [isDeleting, setIsDeleting] = useState(false)
 
   async function handleUpdateRoom(data: {
-    name: string
-    description: string
-    isPrivate: "true" | "false"
+    name?: string
+    description?: string
+    avatarUrl?: string | null
   }) {
     try {
       const payload: EditRoomRequest["body"] = {
         name: data.name,
         description: data.description,
-        isPrivate: data.isPrivate === "true",
+        avatarUrl: data.avatarUrl,
       }
       const updatedRoom = await updateRoom(room.id, payload)
       useAppStore.getState().upsertRoom(updatedRoom)

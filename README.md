@@ -1,30 +1,32 @@
-# OpenSpace 
+# OpenSpace
 
-OpenSpace is a real-time social platform to discover channels, join conversations, and connect with people worldwide. It lets you create custom public or private spaces around any topic, chat in channels, and share media through a fast, modern communication experience.
+OpenSpace is a distraction-free, real-time messaging application for 1-to-1 direct messaging and group chats. Built with a distinctive illustrated stationery & colored-pencil design system on warm tactile paper.
 
 ---
 
 ## Architecture
 
-OpenSpace is organized as a **pnpm + Turborepo** monorepo:
+OpenSpace is structured as a **pnpm + Turborepo** monorepo:
 
-* **`apps/web`** — Next.js 16 frontend with Tailwind CSS, Zustand, and Cloudinary media uploads.
-* **`apps/api-gateway`** — Single entry point managing route proxying, auth verification, and CORS.
-* **`apps/http-service`** — REST API handling users, channel discovery, memberships, and Pramaan auth.
-* **`apps/chat-service`** — Stream-based message ingestion and background persistence with Redis Streams & PostgreSQL.
-* **`apps/ws-service`** — High-concurrency WebSocket server for instant real-time message broadcasting.
-* **`packages/*`** — Shared database schemas (Prisma), auth helpers, TypeScript configs, and validation.
+* **`apps/web2.0`** — Next.js 16 mobile-first web app with Tailwind CSS, Zustand, and Cloudinary media uploads.
+* **`apps/api-gateway`** — Single reverse proxy entry point managing route dispatching, auth verification, and CORS.
+* **`apps/http-service`** — REST API handling users, direct & group chat creation, memberships, and Pramaan auth.
+* **`apps/chat-service`** — Real-time message ingestion, persistence pipeline with Redis Streams, and PostgreSQL.
+* **`apps/ws-service`** — High-concurrency WebSocket server for instant real-time message broadcasting and room subscriptions.
+* **`packages/@repo/db`** — Prisma schema with PostgreSQL database layer (`ChatRoom`, `RoomMember`, `ChatMessage`, `User`).
+* **`packages/@repo/validation`** — Shared Zod validation schemas and TypeScript types across services and frontend.
 
 ---
 
 ## Features
 
-* **Channels & Direct Chat**: Create and discover public or private channels around any topic.
-* **Live Messaging**: Low-latency chat delivery powered by WebSockets and Redis Streams.
-* **Media Attachments**: Direct image and document sharing optimized with Cloudinary.
-* **Authentication**: Streamlined OAuth sign-in with secure, stateless sessions powered by [Pramaan](https://github.com/AnujAcharjee/pramaan).
-* **Modern Interface**: Custom dark and light themes, message replies, and optimistic UI updates.
-* **Containerized Deployment**: Automated Docker Compose workflow with Caddy TLS on AWS EC2.
+* **1-to-1 Direct Messaging**: Search users by username or name to immediately start private conversations.
+* **Group Chats**: Create collaborative groups with member invitations, roles (`OWNER`, `ADMIN`, `MEMBER`), and group management.
+* **Real-Time Delivery**: Low-latency instant message broadcasting powered by WebSockets, Redis Pub/Sub, and Streams.
+* **Media & File Attachments**: Share images and PDF documents with inline previews and lightbox viewer.
+* **Threaded Replies & Soft Deletes**: Reply directly to messages and manage message lifecycles.
+* **Mobile-First Stationery UI**: Responsive dual-pane on desktop, single-pane sliding view on mobile, with colored-pencil aesthetics.
+* **Pramaan Authentication**: Secure OAuth authentication and session management.
 
 ---
 
@@ -34,12 +36,18 @@ OpenSpace is organized as a **pnpm + Turborepo** monorepo:
 ```bash
 pnpm install
 cp .env.example .env
-cp apps/web/.env.example apps/web/.env
+cp apps/web2.0/.env.example apps/web2.0/.env
 ```
 
-### 2. Run
+### 2. Database
 ```bash
-# Run all services
+pnpm --filter @repo/db exec prisma generate
+pnpm --filter @repo/db run db:push
+```
+
+### 3. Run
+```bash
+# Run all services concurrently in dev mode
 pnpm dev
 ```
 

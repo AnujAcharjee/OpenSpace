@@ -5,7 +5,6 @@ import type {
   UserRecord,
   RoomRecord,
   ChatMessagePayload,
-  RoomJoinRequestRecord,
 } from "@repo/validation"
 
 export type RoomMessage = ChatMessagePayload & {
@@ -24,6 +23,39 @@ export type RoomUiOptions = {
   unreadCount?: number
 }
 
+// ─── Direct & Group Presentation Helpers ─────────────────────────────────────
+
+export function getOtherParticipant(
+  room: RoomRecord,
+  currentUserId?: string | null
+): UserRecord | null {
+  if (room.type !== "DIRECT") return null
+  const otherMember = room.members?.find((m) => m.userId !== currentUserId)
+  return otherMember?.user ?? null
+}
+
+export function getRoomDisplayName(
+  room: RoomRecord,
+  currentUserId?: string | null
+): string {
+  if (room.type === "DIRECT") {
+    const other = getOtherParticipant(room, currentUserId)
+    return other?.name || (other?.username ? `@${other.username}` : "Direct Message")
+  }
+  return room.name || "Group Chat"
+}
+
+export function getRoomDisplayAvatar(
+  room: RoomRecord,
+  currentUserId?: string | null
+): string | null {
+  if (room.type === "DIRECT") {
+    const other = getOtherParticipant(room, currentUserId)
+    return other?.avatarUrl ?? null
+  }
+  return room.avatarUrl ?? null
+}
+
 // ─── Slices Interfaces ────────────────────────────────────────────────────────
 
 interface UserState {
@@ -34,7 +66,6 @@ interface UserState {
 interface RoomsState {
   rooms: RoomRecord[]
   activeRoom: string | null
-  isExploringChannels: boolean
   roomUiOptions: Record<string, RoomUiOptions>
   setRooms: (rooms: RoomRecord[]) => void
   upsertRoom: (room: RoomRecord) => void
@@ -47,7 +78,6 @@ interface RoomsState {
   updateRoomLastMessage: (roomId: string, message: ChatMessagePayload) => void
   updateRoomInfo: (roomId: string, data: Partial<RoomRecord>) => void
   setActiveRoom: (roomId: string | null) => void
-  setIsExploringChannels: (isExploring: boolean) => void
 }
 
 interface MessagesState {
@@ -66,13 +96,6 @@ interface DraftsState {
   clearRoomDraft: (roomId: string) => void
 }
 
-interface JoinRequestsState {
-  joinRequests: Record<string, RoomJoinRequestRecord[]>
-  setJoinRequests: (roomId: string, requests: RoomJoinRequestRecord[]) => void
-  addJoinRequest: (roomId: string, request: RoomJoinRequestRecord) => void
-  removeJoinRequest: (roomId: string, requestId: string) => void
-}
-
 interface HydrationState {
   hasHydrated: boolean
   setHasHydrated: (v: boolean) => void
@@ -87,7 +110,6 @@ export type AppState = UserState &
   RoomsState &
   MessagesState &
   DraftsState &
-  JoinRequestsState &
   HydrationState &
   AppActions
 
@@ -111,49 +133,6 @@ function getNextActiveRoomId(
   return rooms[0].id
 }
 
-function safeTimestamp(date?: string | Date | null): number {
-  if (!date) return 0
-  const t = new Date(date).getTime()
-  return Number.isNaN(t) ? 0 : t
-}
-
-export function sortRooms(
-  rooms: RoomRecord[],
-  roomUiOptions: Record<string, RoomUiOptions>
-): RoomRecord[] {
-  return [...rooms].sort((a, b) => {
-    const aOptions = roomUiOptions[a.id]
-    const bOptions = roomUiOptions[b.id]
-    const aPinned = Boolean(aOptions?.pinned)
-    const bPinned = Boolean(bOptions?.pinned)
-
-    // 1. Pinned channels always on top
-    if (aPinned !== bPinned) {
-      return aPinned ? -1 : 1
-    }
-
-    // 2. If both pinned, newest pinned at top
-    if (aPinned && bPinned) {
-      const aPinnedAt = aOptions?.pinnedAt ?? 0
-      const bPinnedAt = bOptions?.pinnedAt ?? 0
-      if (aPinnedAt !== bPinnedAt) {
-        return bPinnedAt - aPinnedAt
-      }
-    }
-
-    // 3. Newest channel/activity at top (guarded against NaN)
-    const aTime = Math.max(
-      safeTimestamp(a.lastMessage?.createdAt),
-      safeTimestamp(a.createdAt)
-    )
-    const bTime = Math.max(
-      safeTimestamp(b.lastMessage?.createdAt),
-      safeTimestamp(b.createdAt)
-    )
-    return bTime - aTime
-  })
-}
-
 function mergeRoomMessages(
   currentMessages: RoomMessage[],
   incomingMessages: RoomMessage[]
@@ -167,11 +146,12 @@ function mergeRoomMessages(
   }
 
   return [...mergedMessages.values()].sort(
-    (left, right) => safeTimestamp(left.createdAt) - safeTimestamp(right.createdAt)
+    (left, right) =>
+      new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime()
   )
 }
 
-// ─── Slices ───────────────────────────────────────────────────────────────────
+// ─── Slice Creators ───────────────────────────────────────────────────────────
 
 const createUserSlice: StateCreator<AppState, [], [], UserState> = (set) => ({
   user: null,
@@ -181,9 +161,7 @@ const createUserSlice: StateCreator<AppState, [], [], UserState> = (set) => ({
 const createRoomsSlice: StateCreator<AppState, [], [], RoomsState> = (set) => ({
   rooms: [],
   activeRoom: null,
-  isExploringChannels: false,
   roomUiOptions: {},
-  setIsExploringChannels: (isExploring) => set({ isExploringChannels: isExploring }),
   setRooms: (rooms) =>
     set((state) => ({
       rooms,
@@ -197,7 +175,7 @@ const createRoomsSlice: StateCreator<AppState, [], [], RoomsState> = (set) => ({
           }
           return acc
         },
-        { ...state.roomUiOptions }
+        {}
       ),
     })),
   upsertRoom: (room) =>
@@ -248,7 +226,7 @@ const createRoomsSlice: StateCreator<AppState, [], [], RoomsState> = (set) => ({
             pinnedAt: nextPinned ? Date.now() : undefined,
             muted: state.roomUiOptions[roomId]?.muted ?? false,
             unread: state.roomUiOptions[roomId]?.unread ?? false,
-            unreadCount: state.roomUiOptions[roomId]?.unreadCount ?? 0,
+            unreadCount: state.roomUiOptions[roomId]?.unreadCount,
           },
         },
       }
@@ -262,13 +240,14 @@ const createRoomsSlice: StateCreator<AppState, [], [], RoomsState> = (set) => ({
           pinnedAt: state.roomUiOptions[roomId]?.pinnedAt,
           muted: !(state.roomUiOptions[roomId]?.muted ?? false),
           unread: state.roomUiOptions[roomId]?.unread ?? false,
-          unreadCount: state.roomUiOptions[roomId]?.unreadCount ?? 0,
+          unreadCount: state.roomUiOptions[roomId]?.unreadCount,
         },
       },
     })),
   toggleRoomUnread: (roomId) =>
     set((state) => {
-      const isUnread = !(state.roomUiOptions[roomId]?.unread ?? false)
+      const currentUnread = state.roomUiOptions[roomId]?.unread ?? false
+      const nextUnread = !currentUnread
       return {
         roomUiOptions: {
           ...state.roomUiOptions,
@@ -276,25 +255,28 @@ const createRoomsSlice: StateCreator<AppState, [], [], RoomsState> = (set) => ({
             pinned: state.roomUiOptions[roomId]?.pinned ?? false,
             pinnedAt: state.roomUiOptions[roomId]?.pinnedAt,
             muted: state.roomUiOptions[roomId]?.muted ?? false,
-            unread: isUnread,
-            unreadCount: isUnread ? 1 : 0,
+            unread: nextUnread,
+            unreadCount: nextUnread ? 1 : 0,
           },
         },
       }
     }),
   incrementRoomUnread: (roomId) =>
-    set((state) => ({
-      roomUiOptions: {
-        ...state.roomUiOptions,
-        [roomId]: {
-          pinned: state.roomUiOptions[roomId]?.pinned ?? false,
-          pinnedAt: state.roomUiOptions[roomId]?.pinnedAt,
-          muted: state.roomUiOptions[roomId]?.muted ?? false,
-          unread: true,
-          unreadCount: (state.roomUiOptions[roomId]?.unreadCount ?? 0) + 1,
+    set((state) => {
+      const currentCount = state.roomUiOptions[roomId]?.unreadCount ?? 0
+      return {
+        roomUiOptions: {
+          ...state.roomUiOptions,
+          [roomId]: {
+            pinned: state.roomUiOptions[roomId]?.pinned ?? false,
+            pinnedAt: state.roomUiOptions[roomId]?.pinnedAt,
+            muted: state.roomUiOptions[roomId]?.muted ?? false,
+            unread: true,
+            unreadCount: currentCount + 1,
+          },
         },
-      },
-    })),
+      }
+    }),
   clearRoomUnread: (roomId) =>
     set((state) => ({
       roomUiOptions: {
@@ -311,65 +293,67 @@ const createRoomsSlice: StateCreator<AppState, [], [], RoomsState> = (set) => ({
   updateRoomLastMessage: (roomId, message) =>
     set((state) => ({
       rooms: state.rooms.map((room) =>
-        room.id === roomId ? { ...room, lastMessage: message } : room
+        room.id === roomId
+          ? {
+              ...room,
+              lastMessage: message,
+              updatedAt: message.createdAt ?? new Date().toISOString(),
+            }
+          : room
       ),
     })),
-  updateRoomInfo: (roomId, data) => {
+  updateRoomInfo: (roomId, data) =>
     set((state) => ({
       rooms: state.rooms.map((room) =>
-        room.id === roomId ? { ...room, ...data } : room
+        room.id === roomId
+          ? {
+              ...room,
+              ...data,
+              updatedAt: new Date().toISOString(),
+            }
+          : room
       ),
-    }))
-  },
-  setActiveRoom: (roomId) =>
-    set((state) => ({
-      activeRoom: roomId,
-      isExploringChannels: roomId ? false : state.isExploringChannels,
-      roomUiOptions: roomId
-        ? {
-            ...state.roomUiOptions,
-            [roomId]: {
-              pinned: state.roomUiOptions[roomId]?.pinned ?? false,
-              pinnedAt: state.roomUiOptions[roomId]?.pinnedAt,
-              muted: state.roomUiOptions[roomId]?.muted ?? false,
-              unread: false,
-              unreadCount: 0,
-            },
-          }
-        : state.roomUiOptions,
     })),
+  setActiveRoom: (roomId) => set({ activeRoom: roomId }),
 })
 
 const createMessagesSlice: StateCreator<AppState, [], [], MessagesState> = (set) => ({
   messages: {},
   addMessage: (roomId, msg) =>
     set((state) => {
-      const roomMsgs = state.messages[roomId] ?? []
-      if (roomMsgs.some((m) => m.id === msg.id)) {
-        return state
-      }
+      const currentMessages = state.messages[roomId] ?? []
       return {
         messages: {
           ...state.messages,
-          [roomId]: [...roomMsgs, msg],
+          [roomId]: mergeRoomMessages(currentMessages, [msg]),
         },
       }
     }),
   setMessages: (roomId, msgs) =>
-    set((state) => ({
-      messages: {
-        ...state.messages,
-        [roomId]: mergeRoomMessages(state.messages[roomId] ?? [], msgs),
-      },
-    })),
-  removeMessage: (roomId, messageId) =>
     set((state) => {
-      const roomMsgs = state.messages[roomId] ?? []
+      const currentMessages = state.messages[roomId] ?? []
       return {
         messages: {
           ...state.messages,
-          [roomId]: roomMsgs.map((m) =>
-            m.id === messageId ? { ...m, isDeleted: true } : m
+          [roomId]: mergeRoomMessages(currentMessages, msgs),
+        },
+      }
+    }),
+  removeMessage: (roomId, messageId) =>
+    set((state) => {
+      const currentMessages = state.messages[roomId] ?? []
+      return {
+        messages: {
+          ...state.messages,
+          [roomId]: currentMessages.map((msg) =>
+            msg.id === messageId
+              ? {
+                  ...msg,
+                  isDeleted: true,
+                  text: undefined,
+                  attachments: undefined,
+                }
+              : msg
           ),
         },
       }
@@ -377,22 +361,6 @@ const createMessagesSlice: StateCreator<AppState, [], [], MessagesState> = (set)
   replaceMessage: (roomId, oldMessageId, newMessage) =>
     set((state) => {
       const roomMsgs = state.messages[roomId] ?? []
-      const alreadyHasNew = roomMsgs.some(
-        (m) => m.id === newMessage.id && m.id !== oldMessageId
-      )
-
-      if (alreadyHasNew) {
-        // Message already arrived via WebSocket broadcast; drop the temporary optimistic message
-        return {
-          messages: {
-            ...state.messages,
-            [roomId]: roomMsgs
-              .filter((m) => m.id !== oldMessageId)
-              .map((m) => (m.id === newMessage.id ? { ...m, ...newMessage } : m)),
-          },
-        }
-      }
-
       return {
         messages: {
           ...state.messages,
@@ -435,39 +403,6 @@ const createDraftsSlice: StateCreator<AppState, [], [], DraftsState> = (set) => 
     }),
 })
 
-const createJoinRequestsSlice: StateCreator<AppState, [], [], JoinRequestsState> = (set) => ({
-  joinRequests: {},
-  setJoinRequests: (roomId, requests) =>
-    set((state) => ({
-      joinRequests: {
-        ...state.joinRequests,
-        [roomId]: requests,
-      },
-    })),
-  addJoinRequest: (roomId, request) =>
-    set((state) => {
-      const current = state.joinRequests[roomId] ?? []
-      if (current.some((r) => r.id === request.id)) {
-        return state
-      }
-      return {
-        joinRequests: {
-          ...state.joinRequests,
-          [roomId]: [...current, request],
-        },
-      }
-    }),
-  removeJoinRequest: (roomId, requestId) =>
-    set((state) => ({
-      joinRequests: {
-        ...state.joinRequests,
-        [roomId]: (state.joinRequests[roomId] ?? []).filter(
-          (r) => r.id !== requestId
-        ),
-      },
-    })),
-})
-
 const createHydrationSlice: StateCreator<AppState, [], [], HydrationState> = (set) => ({
   hasHydrated: false,
   setHasHydrated: (v) => set({ hasHydrated: v }),
@@ -496,11 +431,9 @@ const createAppActionsSlice: StateCreator<AppState, [], [], AppActions> = (set) 
       user: null,
       rooms: [],
       activeRoom: null,
-      isExploringChannels: false,
       roomUiOptions: {},
       messages: {},
       drafts: {},
-      joinRequests: {},
     }),
 })
 
@@ -514,12 +447,11 @@ export const useAppStore = create<AppState>()(
         ...createRoomsSlice(...a),
         ...createMessagesSlice(...a),
         ...createDraftsSlice(...a),
-        ...createJoinRequestsSlice(...a),
         ...createHydrationSlice(...a),
         ...createAppActionsSlice(...a),
       }),
       {
-        name: "openspace-illustrated-cache-v1",
+        name: "openspace-illustrated-cache-v2",
         storage: createJSONStorage(() => localStorage),
         partialize: (state) => ({
           user: state.user,
@@ -527,7 +459,6 @@ export const useAppStore = create<AppState>()(
           activeRoom: state.activeRoom,
           roomUiOptions: state.roomUiOptions,
           drafts: state.drafts,
-          // Cache up to 100 recent messages per channel for 0ms initial load & room switching
           messages: Object.fromEntries(
             Object.entries(state.messages).map(([roomId, msgs]) => [
               roomId,
