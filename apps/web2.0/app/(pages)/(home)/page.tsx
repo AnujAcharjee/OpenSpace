@@ -41,7 +41,7 @@ export default function HomePage() {
             Features
           </a>
           <a href="#about" className="hover:text-ink transition-colors">
-            Design
+            Overview
           </a>
         </div>
 
@@ -62,15 +62,15 @@ export default function HomePage() {
       {/* Hero Section */}
       <main className="flex flex-1 flex-col items-center justify-center px-6 pt-16 pb-24 text-center sm:px-12 sm:pt-24 sm:pb-32">
         <h1 className="hero-pop-text mb-6 max-w-3xl font-display text-4xl font-bold tracking-tight text-ink sm:text-6xl sm:leading-[1.15] cursor-default">
-          Simple, private messaging.
+          Real-time conversations,
           <br />
           <span className="font-serif italic text-[var(--pencil-teal)]">
-            Drawn on fine paper.
+            built for clarity.
           </span>
         </h1>
 
         <p className="mb-10 max-w-xl text-base text-ink-muted sm:text-lg sm:leading-relaxed">
-          OpenSpace is a distraction-free real-time chat application for 1-to-1 direct messaging and group chats, crafted with warm stationery aesthetics.
+          OpenSpace is a fast, distraction-free messaging application for private 1-to-1 chats and team discussions with instant real-time sync.
         </p>
 
         <div className="mb-16 flex flex-col items-center justify-center gap-3 sm:flex-row">
@@ -123,20 +123,20 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* Design System Statement */}
+        {/* Overview Section */}
         <section id="about" className="w-full max-w-3xl py-12 text-center">
           <div className="rounded-[var(--radius-sketch-lg)] border border-line bg-paper-subtle p-8 sm:p-10 shadow-xs">
             <h2 className="font-display text-2xl font-bold tracking-tight text-ink sm:text-3xl mb-3">
-              Stationery & Colored-Pencil Design
+              Fast, Minimal & Distraction-Free
             </h2>
             <p className="text-xs sm:text-sm text-ink-muted leading-relaxed max-w-lg mx-auto mb-6">
-              No neon AI gradients or sterile blue dashboard cards. OpenSpace is styled like physical artist sketchbooks with tactile ivory paper, ink line work, and muted pencil accents.
+              Designed for clean communication without clutter. Connect directly with people, create groups with your team, and send messages with zero lag.
             </p>
             <Link
               href={appUrl}
               className="inline-flex h-10 items-center justify-center rounded-[var(--radius-sketch-sm)] bg-[var(--pencil-teal)] px-6 text-xs font-semibold text-paper hover:bg-[var(--pencil-teal)]/90 transition"
             >
-              Open Application
+              Start Chatting
             </Link>
           </div>
         </section>
