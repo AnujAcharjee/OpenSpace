@@ -16,7 +16,7 @@ export function AppIcon({ size = "md" }: { size?: "sm" | "md" | "lg" }) {
       />
 
       <span
-        className={`relative font-display ${word[size]} font-semibold text-ink transition-colors`}
+        className={`relative font-display ${word[size]} font-semibold text-ink transition-colors leading-none`}
       >
         Open<span className="text-[#6D94C5] dark:text-[#4580b4] font-serif italic">Space</span>
       </span>

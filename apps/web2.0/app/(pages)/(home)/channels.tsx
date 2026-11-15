@@ -585,19 +585,19 @@ export default function ChannelsSection() {
   return (
     <Card className="h-full w-full flex flex-col border border-[#d4a03d]/40 dark:border-line bg-paper rounded-[var(--radius-sketch-md)] overflow-hidden shadow-xs">
       {/* ─── TOP BAR ─── */}
-      <div className="p-3 pb-2 border-b border-line flex items-center justify-between gap-2 shrink-0">
+      <div className="h-14 px-3 border-b border-line flex items-center justify-between gap-2 shrink-0">
         <div className="flex items-center min-w-0">
           <AppIcon size="sm" />
         </div>
 
-        <div className="flex items-center gap-1 shrink-0">
+        <div className="flex items-center gap-1.5 shrink-0">
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
                 variant="outline"
                 size="icon"
                 onClick={() => setIsNewChatOpen(true)}
-                className="size-8 rounded-[var(--radius-sketch-sm)] border-line bg-paper-subtle hover:bg-paper-dark text-ink shadow-2xs cursor-pointer"
+                className="size-8 rounded-[var(--radius-sketch-sm)] border-line bg-paper-subtle hover:bg-paper-dark text-ink shadow-2xs cursor-pointer flex items-center justify-center"
               >
                 <IconPlus size={16} className="text-[var(--pencil-teal)]" />
               </Button>
