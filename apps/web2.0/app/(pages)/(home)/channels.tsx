@@ -585,21 +585,22 @@ export default function ChannelsSection() {
   return (
     <Card className="h-full w-full flex flex-col border border-[#d4a03d]/40 dark:border-line bg-paper rounded-[var(--radius-sketch-md)] overflow-hidden shadow-xs">
       {/* ─── TOP BAR ─── */}
-      <div className="h-14 px-3 border-b border-line flex items-center justify-between gap-2 shrink-0">
+      <div className="h-11 px-3 border-b border-line flex items-center justify-between gap-2 shrink-0">
         <div className="flex items-center min-w-0">
           <AppIcon size="sm" />
         </div>
 
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div className="flex items-center gap-0.5 shrink-0">
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
-                variant="outline"
-                size="icon"
+                variant="ghost"
+                size="icon-sm"
                 onClick={() => setIsNewChatOpen(true)}
-                className="size-8 rounded-[var(--radius-sketch-sm)] border-line bg-paper-subtle hover:bg-paper-dark text-ink shadow-2xs cursor-pointer flex items-center justify-center"
+                className="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-[var(--radius-sketch-sm)] text-ink-muted transition-all hover:bg-surface-hover hover:text-ink"
+                aria-label="New Conversation"
               >
-                <IconPlus size={16} className="text-[var(--pencil-teal)]" />
+                <IconPlus size={18} />
               </Button>
             </TooltipTrigger>
             <TooltipContent>New Conversation</TooltipContent>
@@ -609,7 +610,7 @@ export default function ChannelsSection() {
       </div>
 
       {/* ─── SEARCH INPUT ─── */}
-      <div className="p-2.5 pb-2 shrink-0">
+      <div className="px-3 pt-2.5 pb-2 shrink-0">
         <div className="relative">
           <IconSearch
             size={14}
