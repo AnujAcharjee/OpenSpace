@@ -5,7 +5,6 @@ on:
     branches:
       - main
     paths-ignore:
-      - 'apps/web/**'
       - 'apps/web2.0/**'
       - '**/*.md'
       - '**/*.svg'
@@ -48,7 +47,7 @@ jobs:
         run: pnpm --filter @repo/db exec prisma generate
 
       - name: Build & Type Check
-        run: pnpm turbo run build check-types --filter=!web
+        run: pnpm turbo run build check-types --filter=!web2.0
 
       - name: Run Automated Tests
         run: pnpm test

@@ -20,8 +20,8 @@ generated
 *.tsbuildinfo
 
 # Frontend heavy static assets (not needed for backend container builds)
-apps/web/.next
-apps/web/public
+apps/web2.0/.next
+apps/web2.0/public
 
 # Tests & Coverage
 coverage

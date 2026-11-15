@@ -1,6 +1,0 @@
-User-Agent: *
-Allow: /
-Disallow: /api/
-Disallow: /_next/
-
-Sitemap: https://openspace.anujacharjee.com/sitemap.xml

@@ -1,1 +1,0 @@
-export const deepShadow = "rgba(0, 0, 0, 0.42) 0px 54px 55px, rgba(0, 0, 0, 0.36) 0px -12px 30px, rgba(0, 0, 0, 0.20) 0px 4px 6px, rgba(0, 0, 0, 0.10) 0px 12px 13px, rgba(0, 0, 0, 0.09) 0px -3px 5px"
