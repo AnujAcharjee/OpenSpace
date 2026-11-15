@@ -7,105 +7,9 @@ datasource db {
   provider = "postgresql"
 }
 
-model ChatMessage {
-  id          String        @id
-  type        MessageType   @default(TEXT)
-  parentId    String?
-  userId      String
-  roomId      String
-  text        String
-  attachments Json?
-  isDeleted   Boolean       @default(false)
-  modifiedAt  DateTime?
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime
-  parent      ChatMessage?  @relation("ChatMessageToChatMessage", fields: [parentId], references: [id])
-  replies     ChatMessage[] @relation("ChatMessageToChatMessage")
-  chatRoom    ChatRoom      @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  reactions   Reaction[]
-
-  @@index([parentId])
-  @@index([roomId, createdAt])
-  @@index([userId])
-}
-
-model ChatRoom {
-  id           String                @id
-  name         String                @unique @db.VarChar(100)
-  description  String?               @db.VarChar(255)
-  avatarUrl    String?
-  topics       String[]              @default([])
-  isPrivate    Boolean               @default(false)
-  creatorId    String?
-  createdAt    DateTime              @default(now())
-  updatedAt    DateTime
-  messages     ChatMessage[]
-  creator      User?                 @relation(fields: [creatorId], references: [id])
-  members      ChatRoomMember[]
-  joinRequests ChatRoomJoinRequest[]
-
-  @@index([name])
-}
-
-model ChatRoomMember {
-  id        String         @id
-  roomId    String
-  userId    String
-  role      RoomMemberRole @default(MEMBER)
-  createdAt DateTime       @default(now())
-  chatRoom  ChatRoom       @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([roomId, userId])
-  @@index([userId])
-}
-
-model Reaction {
-  id        String      @id
-  messageId String
-  userId    String
-  emoji     String      @db.VarChar(10)
-  createdAt DateTime    @default(now())
-  message   ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
-  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([messageId, userId, emoji])
-}
-
-model User {
-  id           String                @id
-  email        String                @unique
-  username     String                @unique @db.VarChar(50)
-  name         String?               @db.VarChar(100)
-  bio          String?               @db.VarChar(255)
-  avatarUrl    String?               @db.VarChar(255)
-  lastLogin    DateTime?
-  createdAt    DateTime              @default(now())
-  updatedAt    DateTime
-  messages     ChatMessage[]
-  createdRooms ChatRoom[]
-  memberships  ChatRoomMember[]
-  joinRequests ChatRoomJoinRequest[]
-  reactions    Reaction[]
-
-  @@index([email])
-  @@index([username])
-}
-
-model ChatRoomJoinRequest {
-  id        String            @id
-  roomId    String
-  userId    String
-  status    JoinRequestStatus @default(PENDING)
-  createdAt DateTime          @default(now())
-  updatedAt DateTime
-  chatRoom  ChatRoom          @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([roomId, userId])
-  @@index([roomId, status])
-  @@index([userId])
+enum RoomType {
+  DIRECT
+  GROUP
 }
 
 enum MessageType {
@@ -121,6 +25,73 @@ enum RoomMemberRole {
   MEMBER
 }
 
-enum JoinRequestStatus {
-  PENDING
+model ChatMessage {
+  id          String        @id
+  type        MessageType   @default(TEXT)
+  parentId    String?
+  userId      String
+  roomId      String
+  text        String
+  attachments Json?
+  isDeleted   Boolean       @default(false)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  parent      ChatMessage?  @relation("ChatMessageToChatMessage", fields: [parentId], references: [id])
+  replies     ChatMessage[] @relation("ChatMessageToChatMessage")
+  chatRoom    ChatRoom      @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([parentId])
+  @@index([roomId, createdAt])
+  @@index([userId])
+}
+
+model ChatRoom {
+  id          String           @id
+  type        RoomType         @default(DIRECT)
+  name        String?          @db.VarChar(100)
+  description String?          @db.VarChar(255)
+  avatarUrl   String?
+  creatorId   String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  messages    ChatMessage[]
+  creator     User?            @relation(fields: [creatorId], references: [id])
+  members     ChatRoomMember[]
+
+  @@index([type])
+  @@index([name])
+  @@index([updatedAt])
+}
+
+model ChatRoomMember {
+  id        String         @id
+  roomId    String
+  userId    String
+  role      RoomMemberRole @default(MEMBER)
+  createdAt DateTime       @default(now())
+  chatRoom  ChatRoom       @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, userId])
+  @@index([userId])
+  @@index([roomId])
+}
+
+model User {
+  id           String           @id
+  email        String           @unique
+  username     String           @unique @db.VarChar(50)
+  name         String?          @db.VarChar(100)
+  bio          String?          @db.VarChar(255)
+  avatarUrl    String?          @db.VarChar(255)
+  lastLogin    DateTime?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  messages     ChatMessage[]
+  createdRooms ChatRoom[]
+  memberships  ChatRoomMember[]
+
+  @@index([email])
+  @@index([username])
 }

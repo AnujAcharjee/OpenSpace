@@ -2,15 +2,14 @@ import { describe, it, expect } from 'vitest';
 import {
   searchRoomsSchema,
   createRoomSchema,
+  createDirectRoomSchema,
+  createGroupRoomSchema,
   createMessageSchema,
   wsMessageSchema,
-  requestJoinRoomSchema,
-  respondJoinRequestSchema,
 } from '../index.js';
 
 const VALID_UUID_1 = 'a0000000-0000-0000-0000-000000000001';
 const VALID_UUID_2 = 'b0000000-0000-0000-0000-000000000002';
-const VALID_UUID_3 = 'c0000000-0000-0000-0000-000000000003';
 
 describe('Validation Schemas', () => {
   describe('searchRoomsSchema', () => {
@@ -39,28 +38,56 @@ describe('Validation Schemas', () => {
     });
   });
 
+  describe('createDirectRoomSchema & createGroupRoomSchema', () => {
+    it('should validate direct room creation body', () => {
+      const result = createDirectRoomSchema.safeParse({
+        body: {
+          targetUserId: VALID_UUID_1,
+        },
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('should reject invalid UUID for direct room targetUserId', () => {
+      const result = createDirectRoomSchema.safeParse({
+        body: {
+          targetUserId: 'not-a-uuid',
+        },
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('should validate group room creation body', () => {
+      const result = createGroupRoomSchema.safeParse({
+        body: {
+          name: 'Engineering Team',
+          description: 'Team discussions',
+          memberUsernames: ['alice', 'bob'],
+        },
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('should reject empty group room name', () => {
+      const result = createGroupRoomSchema.safeParse({
+        body: {
+          name: '',
+          memberUsernames: [],
+        },
+      });
+      expect(result.success).toBe(false);
+    });
+  });
+
   describe('createRoomSchema', () => {
     it('should validate valid room creation body', () => {
       const result = createRoomSchema.safeParse({
         body: {
           name: 'Engineering',
           description: 'Engineering discussions',
-          creatorId: VALID_UUID_1,
-          isPrivate: false,
         },
       });
       expect(result.success).toBe(true);
-    });
-
-    it('should reject missing or empty room name', () => {
-      const result = createRoomSchema.safeParse({
-        body: {
-          name: '',
-          creatorId: VALID_UUID_1,
-          isPrivate: false,
-        },
-      });
-      expect(result.success).toBe(false);
     });
   });
 
@@ -121,24 +148,6 @@ describe('Validation Schemas', () => {
           body: 'You have a new message',
           timestamp: Date.now(),
         },
-      });
-      expect(result.success).toBe(true);
-    });
-  });
-
-  describe('requestJoinRoomSchema & respondJoinRequestSchema', () => {
-    it('should validate requestJoinRoom body and params with valid UUIDs', () => {
-      const result = requestJoinRoomSchema.safeParse({
-        params: { id: VALID_UUID_1 },
-        body: { userId: VALID_UUID_2 },
-      });
-      expect(result.success).toBe(true);
-    });
-
-    it('should validate respondJoinRequest body and params with valid UUIDs', () => {
-      const result = respondJoinRequestSchema.safeParse({
-        params: { id: VALID_UUID_1, requestId: VALID_UUID_2 },
-        body: { actorUserId: VALID_UUID_3, approve: true },
       });
       expect(result.success).toBe(true);
     });
