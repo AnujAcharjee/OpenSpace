@@ -46,7 +46,7 @@ import useAppStore, {
 } from "@/stores/app-store"
 import axios from "axios"
 import { useRooms } from "@/hooks/useRooms"
-import { ThemeToggleButton } from "@/components/theme-toggle"
+import { AppIcon } from "@/components/AppIcon"
 import { DialogSettings } from "@/components/DialogSettings"
 import { usersApiUrl } from "@/constants/apiUrls"
 
@@ -586,20 +586,16 @@ export default function ChannelsSection() {
     <Card className="h-full w-full flex flex-col border border-[#d4a03d]/40 dark:border-line bg-paper rounded-[var(--radius-sketch-md)] overflow-hidden shadow-xs">
       {/* ─── TOP BAR ─── */}
       <div className="p-3 pb-2 border-b border-line flex items-center justify-between gap-2 shrink-0">
-        <div className="flex items-center gap-2 min-w-0">
-          <DialogSettings />
-          <div className="min-w-0">
-            <h1 className="font-display text-base font-bold tracking-tight text-ink leading-none">
-              Chats
-            </h1>
-            <p className="text-[11px] text-ink-muted truncate mt-0.5">
-              {user ? `@${user.username}` : "Not signed in"}
+        <div className="flex flex-col min-w-0">
+          <AppIcon size="sm" />
+          {user && (
+            <p className="text-[11px] text-ink-muted truncate mt-0.5 font-medium pl-0.5">
+              @{user.username}
             </p>
-          </div>
+          )}
         </div>
 
         <div className="flex items-center gap-1 shrink-0">
-          <ThemeToggleButton />
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -613,6 +609,7 @@ export default function ChannelsSection() {
             </TooltipTrigger>
             <TooltipContent>New Conversation</TooltipContent>
           </Tooltip>
+          <DialogSettings />
         </div>
       </div>
 
