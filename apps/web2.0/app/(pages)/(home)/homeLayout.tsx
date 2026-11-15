@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect } from "react"
+import { useRouter } from "next/navigation"
 import ChatSection from "./chatSection"
 import ChannelsSection from "./channels"
 import { useIsLargeScreen } from "@/hooks/useIsLargeScreen"
@@ -16,18 +17,29 @@ import { AppIcon } from "@/components/AppIcon"
 import { IconLoader2 } from "@tabler/icons-react"
 
 export default function HomeLayout() {
+  const router = useRouter()
   const { hasHydrated, isLoading, fetch, user, isCurrentUser, activeRoom } = useHomePage()
   const isLg = useIsLargeScreen()
 
   useUserWs(isCurrentUser ? user : null)
 
-  // hydrate
+  // Fetch / revalidate session on mount
   useEffect(() => {
-    if (!hasHydrated) return
     void fetch()
-  }, [fetch, hasHydrated])
+  }, [fetch])
 
-  if (!hasHydrated || isLoading || !user) {
+  // Redirect to signin if user is not authenticated once initial loading is done
+  useEffect(() => {
+    if (!isLoading && !user) {
+      const returnUrl = typeof window !== "undefined"
+        ? encodeURIComponent(`${window.location.pathname}${window.location.search}`)
+        : ""
+      router.replace(`/signin${returnUrl ? `?returnUrl=${returnUrl}` : ""}`)
+    }
+  }, [isLoading, user, router])
+
+  // If no user is cached and still loading/fetching, show the opening screen
+  if (!user) {
     return (
       <div className="relative flex h-svh w-full flex-col items-center justify-center overflow-hidden bg-paper text-ink">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(212,160,61,0.08)_0%,transparent_65%)]" />
@@ -37,7 +49,7 @@ export default function HomeLayout() {
           </div>
           <div className="flex items-center gap-2.5 font-display text-sm font-semibold tracking-tight text-ink-muted">
             <IconLoader2 className="size-4 animate-spin text-[var(--pencil-teal)]" />
-            <span>Opening OpenSpace...</span>
+            <span>{isLoading ? "Opening OpenSpace..." : "Redirecting to sign in..."}</span>
           </div>
         </div>
       </div>

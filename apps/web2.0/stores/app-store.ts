@@ -466,12 +466,26 @@ export const useAppStore = create<AppState>()(
             ])
           ),
         }),
-        onRehydrateStorage: () => (state) => {
+        onRehydrateStorage: () => (state, error) => {
+          if (error) {
+            console.warn("Zustand cache rehydrate error:", error)
+          }
           state?.setHasHydrated(true)
         },
       }
     )
   )
 )
+
+// Ensure hasHydrated is synchronized on the client immediately if persist finished early
+if (typeof window !== "undefined") {
+  if (useAppStore.persist?.hasHydrated?.()) {
+    useAppStore.getState().setHasHydrated(true)
+  } else {
+    useAppStore.persist?.onFinishHydration?.(() => {
+      useAppStore.getState().setHasHydrated(true)
+    })
+  }
+}
 
 export default useAppStore

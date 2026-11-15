@@ -39,8 +39,6 @@ function SignInContent() {
   const signinUrl = useMemo(() => buildPramaanUrl(returnUrl), [returnUrl])
 
   useEffect(() => {
-    if (!hasHydrated) return
-
     let isMounted = true
 
     // Verify session with the backend (inspects the accessToken cookie)
@@ -49,6 +47,7 @@ function SignInContent() {
       try {
         const res = await axios.get(`${usersApiUrl}/hydrate`, {
           withCredentials: true,
+          timeout: 5000,
         })
         if (!isMounted) return
 
@@ -78,7 +77,7 @@ function SignInContent() {
     return () => {
       isMounted = false
     }
-  }, [hasHydrated, returnUrl, router, hydrateUserState, resetAppState])
+  }, [returnUrl, router, hydrateUserState, resetAppState])
 
   function handleNavigate(url: string) {
     setLoading(true)
