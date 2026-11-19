@@ -19,11 +19,16 @@ if (!fs.existsSync(validationDist)) {
   }
 }
 
+const isProd = process.env.NODE_ENV === "production" || process.env.VERCEL === "1"
+const defaultGatewayUrl = isProd
+  ? "https://api.openspace.anujacharjee.com"
+  : "http://localhost:3005"
+
 /** @type {import('next').NextConfig} */
 const apiGatewayUrl =
   process.env.API_GATEWAY_URL ||
   process.env.NEXT_PUBLIC_API_GATEWAY_URL ||
-  "http://localhost:3005"
+  defaultGatewayUrl
 
 const nextConfig = {
   transpilePackages: ["@repo/validation", "@repo/auth"],
