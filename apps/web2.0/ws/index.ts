@@ -12,37 +12,7 @@ import axios from "axios"
 import { handlers } from "./handlers"
 import { usersApiUrl } from "@/constants/apiUrls"
 
-function resolveWsUrl(): string {
-  const envWs = process.env.NEXT_PUBLIC_WS_SRV_URL?.trim()
-  if (envWs) {
-    let url = envWs.replace(/^http:\/\//i, "ws://").replace(/^https:\/\//i, "wss://")
-    if (!url.startsWith("ws://") && !url.startsWith("wss://")) {
-      const isSecure = typeof window !== "undefined" && window.location.protocol === "https:"
-      url = `${isSecure ? "wss" : "ws"}://${url}`
-    }
-    // If pointing to public api domain without /ws path, append /ws
-    if (url.includes("api.openspace.anujacharjee.com") && !url.endsWith("/ws")) {
-      url = `${url.replace(/\/+$/, "")}/ws`
-    }
-    return url
-  }
-
-  // Fallback: derive from NEXT_PUBLIC_API_GATEWAY_URL if available
-  const apiUrl = process.env.NEXT_PUBLIC_API_GATEWAY_URL?.trim()
-  if (apiUrl) {
-    const wsBase = apiUrl.replace(/^https:\/\//i, "wss://").replace(/^http:\/\//i, "ws://")
-    return `${wsBase.replace(/\/+$/, "")}/ws`
-  }
-
-  // Fallback: in browser on production HTTPS domain
-  if (typeof window !== "undefined" && window.location.protocol === "https:") {
-    return "wss://api.openspace.anujacharjee.com/ws"
-  }
-
-  return "ws://localhost:3002"
-}
-
-const wsUrl: string = resolveWsUrl()
+const wsUrl: string = process.env.NEXT_PUBLIC_WS_SRV_URL || "ws://localhost:3002"
 type WsTicketUser = IssueTicketRequest["body"]
 
 class Ws {
