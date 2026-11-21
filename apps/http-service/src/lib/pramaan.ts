@@ -3,7 +3,7 @@ import { PramaanClient } from '@anuj304/pramaan';
 const issuer =
   process.env.PRAMAAN_SERVER_URL ||
   process.env.PRAMAAN_ISSUER ||
-  'https://pramaan.anujacharjee.com';
+  'https://api.pramaan.anujacharjee.com';
 
 const clientId =
   process.env.PRAMAAN_CLIENT_ID ||
