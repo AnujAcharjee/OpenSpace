@@ -35,7 +35,6 @@
     "overrides": {
       "proxy-addr": ">=2.0.8",
       "follow-redirects": ">=1.16.2",
-      "effect": ">=3.22.1",
       "http-proxy-middleware": ">=3.0.7",
       "ws": ">=8.21.0"
     }
