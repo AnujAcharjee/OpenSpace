@@ -24,10 +24,9 @@ export function getCloudinaryConfig() {
     }
   }
 
+  // Fallback to default cloud if environment variable is unset
   if (!cloudName) {
-    throw new Error(
-      'Cloudinary is not configured. Please define NEXT_PUBLIC_CLOUDINARY_URL or NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME in your apps/web2.0/.env file.'
-    );
+    cloudName = 'ddsbhdeju';
   }
 
   return { cloudName, uploadPreset };
@@ -52,12 +51,7 @@ export async function uploadToCloudinary(blob: Blob): Promise<string> {
   try {
     const response = await axios.post(
       `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
-      formData,
-      {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      }
+      formData
     );
 
     if (!response.data || !response.data.secure_url) {
@@ -97,9 +91,6 @@ export async function uploadChatAttachment(
       `https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`,
       formData,
       {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
         onUploadProgress: (progressEvent) => {
           if (progressEvent.total && onProgress) {
             const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);

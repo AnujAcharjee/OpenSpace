@@ -50,6 +50,7 @@ import {
   IconLoader2,
   IconSettings,
   IconCamera,
+  IconInfoCircle,
 } from "@tabler/icons-react"
 import { uploadToCloudinary, type ChatAttachment } from "@/utils/cloudinary"
 import { optimizeImage } from "@/utils/image"
@@ -362,6 +363,22 @@ export default function ChatSection({ room, onShowSidebar }: ChatSectionProps) {
                     </div>
                   ) : (
                     roomMessages.map((msg) => {
+                      const isSystem =
+                        msg.type?.toUpperCase() === "SYSTEM" ||
+                        msg.senderUsername?.toLowerCase() === "system" ||
+                        msg.sender?.toLowerCase() === "system"
+
+                      if (isSystem) {
+                        return (
+                          <SystemMessageNotice
+                            key={msg.id}
+                            id={msg.id}
+                            text={msg.text}
+                            timestamp={formatMessageTime(msg.createdAt)}
+                          />
+                        )
+                      }
+
                       const isOwn = msg.sender === user?.id
                       const parentMsg = msg.parentId ? roomMessagesById.get(msg.parentId) : undefined
 
@@ -611,6 +628,39 @@ export default function ChatSection({ room, onShowSidebar }: ChatSectionProps) {
           </DialogContent>
         </Dialog>
       )}
+    </div>
+  )
+}
+
+// ─── SYSTEM MESSAGE NOTICE COMPONENT ───
+
+function SystemMessageNotice({
+  id,
+  text,
+  timestamp,
+}: {
+  id?: string
+  text?: string
+  timestamp?: string
+}) {
+  return (
+    <div
+      id={id}
+      className="my-3 flex w-full items-center justify-center gap-2.5 px-3 select-text"
+    >
+      <div className="h-px flex-1 border-t border-dashed border-line-strong/60" />
+      <div className="flex max-w-[85%] items-center gap-1.5 rounded-[var(--radius-sketch-sm)] border border-[var(--pencil-orange)]/40 bg-[var(--pencil-orange-soft)] px-3 py-1 shadow-2xs text-center">
+        <IconInfoCircle size={13} className="text-[var(--pencil-orange)] shrink-0" />
+        <span className="text-xs font-medium text-[var(--pencil-orange)] leading-relaxed">
+          {text || "System notice"}
+        </span>
+        {timestamp && (
+          <span className="shrink-0 text-[10px] font-mono text-[var(--pencil-orange)]/75">
+            • {timestamp}
+          </span>
+        )}
+      </div>
+      <div className="h-px flex-1 border-t border-dashed border-line-strong/60" />
     </div>
   )
 }

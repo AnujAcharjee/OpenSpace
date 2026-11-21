@@ -1,7 +1,8 @@
 "use client"
 
 import { useState, useRef } from "react"
-import { IconSettings, IconCamera, IconPencil, IconArrowLeft } from "@tabler/icons-react"
+import { useRouter } from "next/navigation"
+import { IconSettings, IconCamera, IconPencil, IconArrowLeft, IconLogout } from "@tabler/icons-react"
 import { useTheme } from "next-themes"
 import { editUserBodySchema } from "@repo/validation"
 import useAppStore from "@/stores/app-store"
@@ -22,7 +23,7 @@ import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
 import { optimizeImage } from "@/utils/image"
 import { uploadToCloudinary } from "@/utils/cloudinary"
-import { usersApiUrl } from "@/constants/apiUrls"
+import { usersApiUrl, authApiUrl } from "@/constants/apiUrls"
 import axios from "axios"
 import AppForm, { type FieldConfig } from "@/components/AppForm"
 
@@ -31,15 +32,18 @@ const toastOptions = {
 }
 
 export function DialogSettings() {
-  const { user, setUser } = useAppStore(
+  const router = useRouter()
+  const { user, setUser, resetAppState } = useAppStore(
     useShallow((state) => ({
       user: state.user,
       setUser: state.setUser,
+      resetAppState: state.resetAppState,
     }))
   )
   const [open, setOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<"profile" | "appearance">("profile")
   const [isEditing, setIsEditing] = useState(false)
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
   const { theme, setTheme } = useTheme()
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
@@ -52,6 +56,27 @@ export function DialogSettings() {
   if (!user) return null
 
   const userId = user.id
+
+  async function handleLogout() {
+    try {
+      setIsLoggingOut(true)
+      await axios.post(
+        `${authApiUrl}/logout`,
+        {},
+        { withCredentials: true }
+      ).catch(() => {})
+      resetAppState()
+      toast.success("Logged out successfully", toastOptions)
+      setOpen(false)
+      router.replace("/signin")
+    } catch {
+      resetAppState()
+      setOpen(false)
+      router.replace("/signin")
+    } finally {
+      setIsLoggingOut(false)
+    }
+  }
 
   const defaultProfileValues = {
     name: user.name || "",
@@ -191,71 +216,108 @@ export function DialogSettings() {
             <div className="space-y-4">
               {!isEditing ? (
                 /* Profile Display View */
-                <div className="flex flex-col items-center gap-3 py-1">
-                  {/* User Avatar */}
-                  <div className="size-24 overflow-hidden rounded-[var(--radius-sketch-md)] border-2 border-line bg-paper-dark shadow-sm">
-                    <img
-                      src={
-                        user.avatarUrl ||
-                        `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(user.name || user.username)}`
-                      }
-                      alt={user.name || user.username}
-                      className="h-full w-full object-cover"
-                    />
+                <div className="space-y-4 py-1">
+                  {/* Top Action Bar with Edit Profile & Logout on top */}
+                  <div className="flex items-center justify-between pb-1">
+                    <span className="text-[11px] font-semibold text-ink-subtle uppercase tracking-wider">
+                      User Profile
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setIsEditing(true)}
+                        className="flex items-center gap-1.5 rounded-[var(--radius-sketch-sm)] text-xs font-semibold hover:border-[var(--pencil-teal)] cursor-pointer h-7 px-2.5"
+                      >
+                        <IconPencil size={13} stroke={2} />
+                        <span>Edit Profile</span>
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleLogout}
+                        disabled={isLoggingOut}
+                        className="flex items-center gap-1.5 rounded-[var(--radius-sketch-sm)] text-xs font-semibold text-[var(--pencil-coral)] border-[var(--pencil-coral)]/30 hover:bg-[var(--pencil-coral-soft)] cursor-pointer h-7 px-2.5"
+                      >
+                        <IconLogout size={13} stroke={2} />
+                        <span>{isLoggingOut ? "Logging out…" : "Log Out"}</span>
+                      </Button>
+                    </div>
                   </div>
 
-                  {/* Edit Button with Icon directly under user avatar */}
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setIsEditing(true)}
-                    className="flex items-center gap-1.5 rounded-[var(--radius-sketch-sm)] text-xs font-semibold hover:border-[var(--pencil-teal)] cursor-pointer"
-                  >
-                    <IconPencil size={13} stroke={2} />
-                    <span>Edit Profile</span>
-                  </Button>
-
-                  {/* User Profile Information */}
-                  <div className="w-full space-y-3 pt-2">
-                    <div className="flex flex-col items-center text-center">
-                      <h3 className="font-display text-lg font-bold text-ink">
-                        {user.name || user.username}
-                      </h3>
-                      <span className="text-xs text-ink-muted font-mono">
-                        @{user.username}
-                      </span>
+                  {/* User Profile Card: Image, Name, and Details Set to Side (Left-Aligned) */}
+                  <div className="flex items-start gap-4 rounded-[var(--radius-sketch-md)] border border-line bg-paper-subtle p-3.5">
+                    {/* User Avatar on the side */}
+                    <div className="size-20 shrink-0 overflow-hidden rounded-[var(--radius-sketch-md)] border-2 border-line bg-paper-dark shadow-sm">
+                      <img
+                        src={
+                          user.avatarUrl ||
+                          `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(user.name || user.username)}`
+                        }
+                        alt={user.name || user.username}
+                        className="h-full w-full object-cover"
+                      />
                     </div>
 
+                    {/* Name, Username, and Status to the side */}
+                    <div className="flex-1 min-w-0 space-y-1 text-left">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="font-display text-lg font-bold text-ink truncate leading-tight">
+                          {user.name || user.username}
+                        </h3>
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[var(--pencil-green-soft)] text-[var(--pencil-green)] border border-[var(--pencil-green)]/30">
+                          <span className="size-1.5 rounded-full bg-[var(--pencil-green)]" />
+                          Active
+                        </span>
+                      </div>
+                      <p className="text-xs text-ink-muted font-mono truncate">
+                        @{user.username}
+                      </p>
+                      {user.email && (
+                        <p className="text-xs text-ink-subtle truncate pt-0.5">
+                          {user.email}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Bio Information - Left Aligned */}
+                  <div className="space-y-1.5 text-left">
+                    <div className="text-[10px] uppercase font-semibold text-ink-muted tracking-wider">
+                      Bio
+                    </div>
                     {user.bio?.trim() ? (
-                      <div className="rounded-[var(--radius-sketch-sm)] border border-line bg-paper-subtle p-3 text-center">
+                      <div className="rounded-[var(--radius-sketch-sm)] border border-line bg-paper-subtle p-3 text-left">
                         <p className="text-xs text-ink italic leading-relaxed">
                           &ldquo;{user.bio.trim()}&rdquo;
                         </p>
                       </div>
                     ) : (
-                      <div className="rounded-[var(--radius-sketch-sm)] border border-dashed border-line p-3 text-center">
+                      <div className="rounded-[var(--radius-sketch-sm)] border border-dashed border-line p-3 text-left">
                         <p className="text-xs text-ink-subtle italic">No bio added yet</p>
                       </div>
                     )}
+                  </div>
 
-                    <div className="grid grid-cols-2 gap-2 pt-1 text-left">
-                      <div className="rounded-[var(--radius-sketch-sm)] border border-line bg-paper-subtle p-2.5">
-                        <div className="text-[10px] uppercase font-semibold text-ink-muted tracking-wider">
-                          Username
-                        </div>
-                        <div className="text-xs font-semibold text-ink truncate mt-0.5">
-                          {user.username}
-                        </div>
+                  {/* Account Overview Grid - Left Aligned */}
+                  <div className="grid grid-cols-2 gap-2 pt-0.5 text-left">
+                    <div className="rounded-[var(--radius-sketch-sm)] border border-line bg-paper-subtle p-2.5">
+                      <div className="text-[10px] uppercase font-semibold text-ink-muted tracking-wider">
+                        Username
                       </div>
-                      <div className="rounded-[var(--radius-sketch-sm)] border border-line bg-paper-subtle p-2.5">
-                        <div className="text-[10px] uppercase font-semibold text-ink-muted tracking-wider">
-                          Status
-                        </div>
-                        <div className="text-xs font-semibold text-ink truncate mt-0.5 flex items-center gap-1.5">
-                          <span className="size-2 rounded-full bg-[var(--pencil-green)]" />
-                          <span>Active Member</span>
-                        </div>
+                      <div className="text-xs font-semibold text-ink truncate mt-0.5 font-mono">
+                        @{user.username}
+                      </div>
+                    </div>
+                    <div className="rounded-[var(--radius-sketch-sm)] border border-line bg-paper-subtle p-2.5">
+                      <div className="text-[10px] uppercase font-semibold text-ink-muted tracking-wider">
+                        Identity
+                      </div>
+                      <div className="text-xs font-semibold text-ink truncate mt-0.5 flex items-center gap-1.5">
+                        <span className="size-2 rounded-full bg-[var(--pencil-teal)]" />
+                        <span>Pramaan Verified</span>
                       </div>
                     </div>
                   </div>
@@ -371,12 +433,12 @@ export function DialogSettings() {
                   Customize OpenSpace&apos;s stationery aesthetic to your taste.
                 </span>
                 <div className="flex gap-2 mt-2">
-                  {(["light", "dark", "system"] as const).map((t) => (
+                  {(["light", "dark"] as const).map((t) => (
                     <Button
                       key={t}
                       type="button"
                       variant={theme === t ? "default" : "outline"}
-                      className="px-4 py-2 capitalize font-semibold rounded-[var(--radius-sketch-sm)]"
+                      className="px-4 py-2 capitalize font-semibold rounded-[var(--radius-sketch-sm)] cursor-pointer"
                       onClick={() => setTheme(t)}
                     >
                       {t}
