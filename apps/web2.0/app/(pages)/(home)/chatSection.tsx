@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useRef, useMemo } from "react"
+import { useEffect, useState, useRef, useMemo, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import useAppStore, {
@@ -49,8 +49,10 @@ import {
   IconExternalLink,
   IconLoader2,
   IconSettings,
+  IconCamera,
 } from "@tabler/icons-react"
-import type { ChatAttachment } from "@/utils/cloudinary"
+import { uploadToCloudinary, type ChatAttachment } from "@/utils/cloudinary"
+import { optimizeImage } from "@/utils/image"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   ContextMenu,
@@ -131,6 +133,38 @@ export default function ChatSection({ room, onShowSidebar }: ChatSectionProps) {
 
   const inputRef = useRef<HTMLInputElement>(null)
   const chatFileInputRef = useRef<HTMLInputElement>(null)
+
+  const handleSelectEmoji = useCallback(
+    (emoji: string) => {
+      const input = inputRef.current
+      if (input) {
+        const start = input.selectionStart ?? draft.length
+        const end = input.selectionEnd ?? draft.length
+        const newDraft = draft.substring(0, start) + emoji + draft.substring(end)
+        setDraft(newDraft)
+        const nextPos = start + emoji.length
+        setTimeout(() => {
+          input.focus()
+          input.setSelectionRange(nextPos, nextPos)
+        }, 0)
+      } else {
+        setDraft(draft + emoji)
+      }
+    },
+    [draft, setDraft]
+  )
+
+  const handleSendMessage = useCallback(
+    (e?: React.FormEvent) => {
+      if (e) e.preventDefault()
+      if (isSending || (!draft.trim() && !stagedAttachment)) return
+      setShowEmojiPicker(false)
+      const textToSend = draft
+      if (inputRef.current) inputRef.current.value = ""
+      void sendMessage(textToSend)
+    },
+    [draft, isSending, sendMessage, stagedAttachment]
+  )
 
   // Scroll to bottom on new messages
   useEffect(() => {
@@ -373,23 +407,17 @@ export default function ChatSection({ room, onShowSidebar }: ChatSectionProps) {
 
         {/* ─── MESSAGE COMPOSER FOOTER ─── */}
         {!showMembersPanel && (
-          <CardFooter className="shrink-0 border-t border-line bg-paper-subtle/80 p-2.5">
+          <CardFooter className="shrink-0 border-t border-line bg-paper-subtle/80 p-2.5 relative overflow-visible">
             <form
-              className="flex w-full flex-col gap-1.5"
-              onSubmit={(e) => {
-                e.preventDefault()
-                if (isSending || (!draft.trim() && !stagedAttachment)) return
-                const textToSend = draft
-                setDraft("")
-                if (inputRef.current) inputRef.current.value = ""
-                void sendMessage(textToSend)
-              }}
+              className="relative flex w-full flex-col gap-1.5"
+              onSubmit={handleSendMessage}
             >
               {/* Emoji Picker Popover */}
               <EmojiPicker
                 isOpen={showEmojiPicker}
                 onClose={() => setShowEmojiPicker(false)}
-                onSelectEmoji={(emoji) => setDraft(draft + emoji)}
+                onSelectEmoji={handleSelectEmoji}
+                align="right"
               />
 
               {/* Staged Attachment Preview Bar */}
@@ -473,6 +501,22 @@ export default function ChatSection({ room, onShowSidebar }: ChatSectionProps) {
                 />
 
                 <InputGroup className="h-9.5 flex-1 border border-line bg-paper shadow-2xs rounded-[var(--radius-sketch-sm)] focus-within:border-[var(--pencil-teal)]">
+                  <InputGroupAddon align="inline-start">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          onClick={() => chatFileInputRef.current?.click()}
+                          className="p-1 text-ink-muted hover:text-ink transition cursor-pointer"
+                          aria-label="Attach file"
+                        >
+                          <IconPaperclip size={18} />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent>Attach image or PDF</TooltipContent>
+                    </Tooltip>
+                  </InputGroupAddon>
+
                   <InputGroupInput
                     ref={inputRef}
                     value={draft}
@@ -480,12 +524,7 @@ export default function ChatSection({ room, onShowSidebar }: ChatSectionProps) {
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && !e.shiftKey) {
                         e.preventDefault()
-                        if (!isSending && (draft.trim() || stagedAttachment)) {
-                          const textToSend = draft
-                          setDraft("")
-                          if (inputRef.current) inputRef.current.value = ""
-                          void sendMessage(textToSend)
-                        }
+                        handleSendMessage()
                       }
                     }}
                     onPaste={handlePaste}
@@ -501,27 +540,21 @@ export default function ChatSection({ room, onShowSidebar }: ChatSectionProps) {
                     disabled={!user}
                   />
 
-                  <InputGroupAddon>
+                  <InputGroupAddon align="inline-end">
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <button
                           type="button"
-                          onClick={() => chatFileInputRef.current?.click()}
-                          className="p-1 text-ink-muted hover:text-ink transition cursor-pointer"
-                          aria-label="Attach file"
-                        >
-                          <IconPaperclip size={18} />
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent>Attach image or PDF</TooltipContent>
-                    </Tooltip>
-
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button
-                          type="button"
-                          onClick={() => setShowEmojiPicker((prev) => !prev)}
-                          className="p-1 text-ink-muted hover:text-ink transition cursor-pointer"
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            setShowEmojiPicker((prev) => !prev)
+                          }}
+                          className={`p-1 transition cursor-pointer rounded-[var(--radius-sketch-sm)] ${
+                            showEmojiPicker
+                              ? "text-[var(--pencil-yellow)] bg-[var(--pencil-yellow-soft)]"
+                              : "text-ink-muted hover:text-ink hover:bg-paper-subtle"
+                          }`}
                           aria-label="Add emoji"
                         >
                           <IconMoodSmile size={18} />
@@ -529,9 +562,7 @@ export default function ChatSection({ room, onShowSidebar }: ChatSectionProps) {
                       </TooltipTrigger>
                       <TooltipContent>Add emoji</TooltipContent>
                     </Tooltip>
-                  </InputGroupAddon>
 
-                  <InputGroupAddon align="inline-end">
                     <InputGroupButton
                       type="submit"
                       variant="ghost"
@@ -973,10 +1004,15 @@ function DialogEditGroup({ room }: { room: RoomRecord }) {
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
 
   const [name, setName] = useState(room.name || "")
   const [description, setDescription] = useState(room.description || "")
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [removePhoto, setRemovePhoto] = useState(false)
 
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const { updateRoom, deleteRoom } = useRooms()
   const upsertRoom = useAppStore((s) => s.upsertRoom)
   const removeRoom = useAppStore((s) => s.removeRoom)
@@ -984,26 +1020,60 @@ function DialogEditGroup({ room }: { room: RoomRecord }) {
   useEffect(() => {
     setName(room.name || "")
     setDescription(room.description || "")
-  }, [room.name, room.description, open])
+    setSelectedFile(null)
+    setPreviewUrl(null)
+    setRemovePhoto(false)
+  }, [room.name, room.description, room.avatarUrl, open])
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please upload an image file (PNG, JPG, WebP)", toastOptions)
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Image file must be under 5MB", toastOptions)
+      return
+    }
+    setSelectedFile(file)
+    setPreviewUrl(URL.createObjectURL(file))
+    setRemovePhoto(false)
+  }
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
-    if (!name.trim() || isSubmitting) return
+    if (!name.trim() || isSubmitting || isUploading) return
 
     setIsSubmitting(true)
+    setIsUploading(true)
     try {
+      let finalAvatarUrl: string | null | undefined = undefined
+
+      if (removePhoto) {
+        finalAvatarUrl = null
+      } else if (selectedFile) {
+        const optimizedBlob = await optimizeImage(selectedFile)
+        finalAvatarUrl = await uploadToCloudinary(optimizedBlob)
+      }
+
       const payload: EditRoomRequest["body"] = {
         name: name.trim(),
         description: description.trim() || undefined,
+        ...(finalAvatarUrl !== undefined ? { avatarUrl: finalAvatarUrl } : {}),
       }
       const updated = await updateRoom(room.id, payload)
       upsertRoom(updated)
       setOpen(false)
-      toast.success("Group updated", toastOptions)
-    } catch {
-      toast.error("Failed to update group", toastOptions)
+      toast.success("Group updated successfully", toastOptions)
+    } catch (err) {
+      const message = axios.isAxiosError(err)
+        ? (err.response?.data?.error ?? err.response?.data?.message ?? "Failed to update group")
+        : (err instanceof Error ? err.message : "Failed to update group")
+      toast.error(message, toastOptions)
     } finally {
       setIsSubmitting(false)
+      setIsUploading(false)
     }
   }
 
@@ -1021,6 +1091,10 @@ function DialogEditGroup({ room }: { room: RoomRecord }) {
       setIsDeleting(false)
     }
   }
+
+  const currentAvatar = removePhoto
+    ? null
+    : previewUrl || room.avatarUrl || null
 
   return (
     <>
@@ -1045,11 +1119,73 @@ function DialogEditGroup({ room }: { room: RoomRecord }) {
               Group Settings
             </DialogTitle>
             <DialogDescription className="text-xs text-ink-muted">
-              Update group details or delete this group.
+              Update group name, description, avatar photo, or delete this group.
             </DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={handleSave} className="space-y-3 pt-3">
+          <form onSubmit={handleSave} className="space-y-3.5 pt-3">
+            {/* Room Avatar Upload */}
+            <div className="flex flex-col items-center gap-2.5 py-1">
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                className="group relative size-20 cursor-pointer overflow-hidden rounded-[var(--radius-sketch-md)] border-2 border-line bg-paper-dark shadow-xs transition-all hover:border-[var(--pencil-teal)]"
+              >
+                {currentAvatar ? (
+                  <img
+                    src={currentAvatar}
+                    alt={name || "Room avatar"}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center bg-[var(--pencil-yellow-soft)] text-[var(--pencil-yellow)]">
+                    <IconUsers size={28} />
+                  </div>
+                )}
+
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-ink/60 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+                  <IconCamera className="size-5 text-paper" />
+                  <span className="mt-1 text-[9px] font-semibold text-paper">Upload</span>
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-2.5 text-xs font-semibold rounded-[var(--radius-sketch-sm)] cursor-pointer"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <IconCamera size={13} className="mr-1.5" />
+                  {currentAvatar ? "Change photo" : "Upload photo"}
+                </Button>
+
+                {currentAvatar && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2.5 text-xs font-semibold rounded-[var(--radius-sketch-sm)] text-[var(--pencil-coral)] hover:bg-[var(--pencil-coral-soft)] cursor-pointer"
+                    onClick={() => {
+                      setSelectedFile(null)
+                      setPreviewUrl(null)
+                      setRemovePhoto(true)
+                    }}
+                  >
+                    Remove
+                  </Button>
+                )}
+              </div>
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png, image/jpeg, image/webp"
+                className="hidden"
+                onChange={handleFileChange}
+              />
+            </div>
+
             <div className="space-y-1">
               <label className="text-xs font-semibold text-ink">Group Name *</label>
               <input
@@ -1096,10 +1232,22 @@ function DialogEditGroup({ room }: { room: RoomRecord }) {
                 <Button
                   type="submit"
                   size="sm"
-                  disabled={!name.trim() || isSubmitting}
-                  className="h-8 text-xs bg-[var(--pencil-teal)] text-white hover:bg-[var(--pencil-teal)]/90 rounded-[var(--radius-sketch-sm)]"
+                  disabled={!name.trim() || isSubmitting || isUploading}
+                  className="h-8 text-xs bg-[var(--pencil-teal)] text-white hover:bg-[var(--pencil-teal)]/90 rounded-[var(--radius-sketch-sm)] cursor-pointer disabled:opacity-50"
                 >
-                  {isSubmitting ? "Saving..." : "Save"}
+                  {isUploading ? (
+                    <>
+                      <IconLoader2 size={13} className="mr-1.5 animate-spin" />
+                      Uploading...
+                    </>
+                  ) : isSubmitting ? (
+                    <>
+                      <IconLoader2 size={13} className="mr-1.5 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    "Save Changes"
+                  )}
                 </Button>
               </div>
             </div>

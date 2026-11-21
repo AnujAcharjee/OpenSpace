@@ -177,6 +177,7 @@ export interface EmojiPickerProps {
   onClose: () => void
   onSelectEmoji: (emoji: string) => void
   className?: string
+  align?: "left" | "right"
 }
 
 export function EmojiPicker({
@@ -184,6 +185,7 @@ export function EmojiPicker({
   onClose,
   onSelectEmoji,
   className = "",
+  align = "right",
 }: EmojiPickerProps) {
   const [activeCategoryIndex, setActiveCategoryIndex] = useState(0)
   const [searchQuery, setSearchQuery] = useState("")
@@ -280,10 +282,13 @@ export function EmojiPicker({
 
   if (!isOpen) return null
 
+  const alignmentClass = align === "right" ? "right-0 sm:right-1" : "left-0 sm:left-2"
+
   return (
     <div
       ref={containerRef}
-      className={`absolute bottom-full mb-3 left-0 sm:left-2 z-50 flex flex-col w-80 sm:w-[340px] max-h-[380px] rounded-[var(--radius-sketch-md)] border border-line bg-paper shadow-xl p-3 text-ink animate-in fade-in zoom-in-95 duration-150 select-none ${className}`}
+      onClick={(e) => e.stopPropagation()}
+      className={`absolute bottom-full mb-2 ${alignmentClass} z-50 flex flex-col w-80 sm:w-[340px] max-h-[380px] rounded-[var(--radius-sketch-md)] border border-line bg-paper shadow-xl p-3 text-ink animate-in fade-in zoom-in-95 duration-150 select-none ${className}`}
       role="dialog"
       aria-label="Emoji picker"
     >

@@ -218,6 +218,7 @@ function useSendMessage(
   )
 
   const [isSending, setIsSending] = useState(false)
+  const isSendingRef = useRef(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [stagedAttachment, setStagedAttachment] = useState<StagedAttachment | null>(null)
 
@@ -243,18 +244,25 @@ function useSendMessage(
   const sendMessage = useCallback(
     async (textToSend?: string) => {
       const text = (textToSend ?? draft).trim()
-      if (!roomId || (!text && !stagedAttachment) || isSending) return
+      if (!roomId || (!text && !stagedAttachment) || isSendingRef.current) return
+
+      isSendingRef.current = true
+      setIsSending(true)
 
       const clientMessageId = crypto.randomUUID()
       const timestamp = new Date().toISOString()
       let attachmentsString: string | undefined
+      const pendingAttachment = stagedAttachment
 
-      setIsSending(true)
+      // Clear draft, attachment and reply state immediately for instant feedback
+      setDraft("")
+      clearStagedAttachment()
+      clearReply()
 
       try {
-        if (stagedAttachment) {
+        if (pendingAttachment) {
           const uploaded = await uploadChatAttachment(
-            stagedAttachment.file,
+            pendingAttachment.file,
             (progress) => setUploadProgress(progress)
           )
           attachmentsString = JSON.stringify([uploaded])
@@ -284,9 +292,6 @@ function useSendMessage(
 
         addMessage(roomId, optimisticMessage)
         updateRoomLastMessage(roomId, toRoomPreviewMessage(optimisticMessage))
-        setDraft("")
-        clearStagedAttachment()
-        clearReply()
 
         const confirmedMessage = await createMessage({
           roomId,
@@ -321,6 +326,7 @@ function useSendMessage(
           : "Unable to send message"
         toast.error(message, toastOptions)
       } finally {
+        isSendingRef.current = false
         setIsSending(false)
         setUploadProgress(0)
       }
@@ -329,7 +335,6 @@ function useSendMessage(
       roomId,
       draft,
       stagedAttachment,
-      isSending,
       userId,
       replyingTo,
       user?.username,

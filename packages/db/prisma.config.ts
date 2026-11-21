@@ -1,5 +1,7 @@
-import 'dotenv/config';
+import { initEnv } from '@repo/env';
 import { defineConfig } from 'prisma/config';
+
+initEnv();
 
 declare const process: { env: Record<string, string | undefined> };
 

@@ -60,10 +60,10 @@ export const useRooms = () => {
     return room
   }, [])
 
-  const createDirectRoom = useCallback(async (participantId: string) => {
+  const createDirectRoom = useCallback(async (targetUserId: string) => {
     const res = await axios.post<RoomResponse>(
       `${roomsApiUrl}/direct`,
-      { participantId },
+      { targetUserId, participantId: targetUserId },
       { withCredentials: true }
     )
     const room = res.data.data?.room

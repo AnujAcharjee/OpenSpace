@@ -13,6 +13,8 @@ const clientId =
 
 const clientSecret =
   process.env.PRAMAAN_CLIENT_SECRET ||
+  process.env.PRAMAAN_SECRET ||
+  process.env.OPENSPACE_SECRET ||
   (() => {
     throw new Error('PRAMAAN_CLIENT_SECRET is not configured');
   })();

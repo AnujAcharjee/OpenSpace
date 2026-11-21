@@ -2,9 +2,19 @@ import { execSync } from "node:child_process"
 import fs from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
+import dotenv from "dotenv"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
+
+// Load root workspace env (.env.dev in dev, .env.production in cloud/prod)
+const rootDir = path.resolve(__dirname, "../..")
+const isCloud = process.env.ENV_TARGET === "cloud" || process.env.NODE_ENV === "production"
+const rootEnvFile = isCloud ? ".env.production" : ".env.dev"
+const rootEnvPath = path.join(rootDir, rootEnvFile)
+if (fs.existsSync(rootEnvPath)) {
+  dotenv.config({ path: rootEnvPath })
+}
 
 // Ensure @repo/validation is built before Next.js Turbopack resolves workspace packages
 const validationDist = path.resolve(__dirname, "../../packages/validation/dist/index.js")

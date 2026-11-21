@@ -141,8 +141,22 @@ function mergeRoomMessages(
     currentMessages.map((message) => [message.id, message])
   )
 
-  for (const message of incomingMessages) {
-    mergedMessages.set(message.id, message)
+  for (const incoming of incomingMessages) {
+    // Reconcile incoming confirmed message with any matching optimistic placeholder ("sending")
+    for (const [id, current] of mergedMessages.entries()) {
+      if (
+        current.status === "sending" &&
+        current.sender === incoming.sender &&
+        current.roomId === incoming.roomId &&
+        (current.text ?? "") === (incoming.text ?? "") &&
+        (current.attachments ?? "") === (incoming.attachments ?? "")
+      ) {
+        mergedMessages.delete(id)
+        break
+      }
+    }
+
+    mergedMessages.set(incoming.id, incoming)
   }
 
   return [...mergedMessages.values()].sort(
@@ -361,10 +375,27 @@ const createMessagesSlice: StateCreator<AppState, [], [], MessagesState> = (set)
   replaceMessage: (roomId, oldMessageId, newMessage) =>
     set((state) => {
       const roomMsgs = state.messages[roomId] ?? []
+      const alreadyHasNew = roomMsgs.some((m) => m.id === newMessage.id)
+
+      let updatedMsgs: RoomMessage[]
+      if (alreadyHasNew) {
+        // If WebSocket already added the new message, just remove the old optimistic message
+        updatedMsgs = roomMsgs.filter((m) => m.id !== oldMessageId)
+      } else {
+        // Replace the old optimistic message with the new confirmed message
+        updatedMsgs = roomMsgs.map((m) => (m.id === oldMessageId ? newMessage : m))
+      }
+
+      // Safeguard: guarantee strict deduplication by id
+      const deduplicated = new Map(updatedMsgs.map((m) => [m.id, m]))
+
       return {
         messages: {
           ...state.messages,
-          [roomId]: roomMsgs.map((m) => (m.id === oldMessageId ? newMessage : m)),
+          [roomId]: [...deduplicated.values()].sort(
+            (left, right) =>
+              new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime()
+          ),
         },
       }
     }),

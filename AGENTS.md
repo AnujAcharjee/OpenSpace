@@ -4,10 +4,12 @@
 - **NEVER** run `git commit`, `git push`, or trigger deployments autonomously.
 - **ONLY** commit when the user explicitly requests it (e.g. *"commit this"*, *"make a commit"*), or after explicitly asking for permission and getting user approval.
 - **NEVER** deploy services or run production database migrations without explicit confirmation.
-- **GitHub Actions Commit Options**:
-  - Skip backend deployment: add `[skip deploy]`, `[skip-deploy]`, `[no deploy]`, or `[skip cd]` to commit message.
-  - Skip entire CI/CD: add `[skip ci]` or `[ci skip]`.
-  - Frontend (`apps/web/**` or `apps/web2.0/**`) and documentation (`**/*.md`) commits automatically skip deployment via `paths-ignore`.
+- **GitHub Actions Deployment Options**:
+  - **Default**: On push to `main`, tests run and Docker images are built and pushed to Docker Hub (`anuj304/openspace:<service>`), but **EC2 deployment is skipped**.
+  - **Deploy to EC2**: Add `[deploy]` or `[deploy-ec2]` to the commit message (or trigger manually via `workflow_dispatch` in GitHub Actions).
+  - **Skip Docker Build & Push**: Add `[skip deploy]`, `[skip-deploy]`, `[no deploy]`, or `[skip cd]` to commit message.
+  - **Skip entire CI/CD**: Add `[skip ci]` or `[ci skip]`.
+  - Frontend (`apps/web2.0/**`) and documentation (`**/*.md`) commits automatically skip deployment via `paths-ignore`.
 - Full details in [`.agents/rules/deploy-and-commit-safety.md`](.agents/rules/deploy-and-commit-safety.md).
 
 ## 2. Web2.0 Redesign Rules

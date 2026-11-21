@@ -54,41 +54,54 @@ export function initEnv(options: InitEnvOptions = {}): void {
   const baseEnvPath = path.join(rootDir, '.env');
 
   if (isCloudTarget) {
-    // Cloud mode (Neon DB & Upstash Redis)
-    if (fs.existsSync(baseEnvPath)) {
-      dotenv.config({ path: baseEnvPath, override: true });
+    // Cloud / Production mode (Neon DB & Upstash Redis)
+    const prodFiles = [
+      '.env.production',
+      '.env.prod',
+      '.env',
+    ];
+    for (const file of prodFiles) {
+      const rootProdFile = path.join(rootDir, file);
+      if (fs.existsSync(rootProdFile)) {
+        dotenv.config({ path: rootProdFile, override: true });
+        break;
+      }
     }
   } else {
     // Local Docker mode (default in dev: localhost:5432 & localhost:6379)
-    // 2a. Load base .env first
-    if (fs.existsSync(baseEnvPath)) {
-      dotenv.config({ path: baseEnvPath });
-    }
-
-    // Also check app-local .env
-    const localEnvPath = path.resolve(process.cwd(), '.env');
-    if (localEnvPath !== baseEnvPath && fs.existsSync(localEnvPath)) {
-      dotenv.config({ path: localEnvPath });
-    }
-
-    // 2b. Override with local development files
     const devFiles = [
+      '.env.dev',
       '.env.development',
       '.env.local',
       '.env.development.local',
     ];
 
+    let loadedDev = false;
     for (const file of devFiles) {
       // Root level override
       const rootDevFile = path.join(rootDir, file);
       if (fs.existsSync(rootDevFile)) {
         dotenv.config({ path: rootDevFile, override: true });
+        loadedDev = true;
       }
 
       // App level override
       const appDevFile = path.resolve(process.cwd(), file);
       if (appDevFile !== rootDevFile && fs.existsSync(appDevFile)) {
         dotenv.config({ path: appDevFile, override: true });
+        loadedDev = true;
+      }
+    }
+
+    // Fallback to base .env or .env.production if no dev file found
+    if (!loadedDev) {
+      if (fs.existsSync(baseEnvPath)) {
+        dotenv.config({ path: baseEnvPath });
+      } else {
+        const prodPath = path.join(rootDir, '.env.production');
+        if (fs.existsSync(prodPath)) {
+          dotenv.config({ path: prodPath });
+        }
       }
     }
   }
